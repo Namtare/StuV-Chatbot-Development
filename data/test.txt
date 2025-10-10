@@ -1,0 +1,1 @@
+Yuhu, dies ist eine test-datei, die vom MCP-server gelesen werden kann!
