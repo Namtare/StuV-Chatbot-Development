@@ -22,7 +22,6 @@ export async function getMCPClient() {
     }
   );
 
-  // connect more servers here
   await mcpClient.connect(transport);
   return mcpClient;
 }

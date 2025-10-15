@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getMCPTools, callMCPTool } from "@/lib/mcp-client";
+import { getMCPTools, callMCPTool } from "@/lib/mcp-client.example";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,

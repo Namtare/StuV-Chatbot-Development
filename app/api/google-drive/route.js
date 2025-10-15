@@ -1,3 +1,5 @@
+// TODO: should also be able to OAuth everything.
+
 import { NextResponse } from "next/server";
 
 export async function GET(request) {
