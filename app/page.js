@@ -59,7 +59,7 @@ export default function Home() {
           disabled={isLoading || !inputValue}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-300"
           style={{ marginTop: "20px" }}
-        >
+        >about:blank#blocked
           {isLoading ? "Loading..." : "Ask Claude"}
         </button>
       </div>

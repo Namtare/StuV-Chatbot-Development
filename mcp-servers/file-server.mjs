@@ -7,9 +7,10 @@ import {
 import fs from "fs/promises";
 import path from "path";
 
+
 // Configure the allowed directory
 const ALLOWED_DIR = path.resolve(
-  "C:\\Users\\spamm\\PersonalWebsite\\personal-website\\data"
+  process.env.LOCAL_FILE_PATH
 );
 
 const server = new Server(

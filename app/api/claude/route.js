@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { getMCPTools, callMCPTool } from "@/lib/mcp-client.example";
+import { getGDriveMCPTools, callGDriveMCPTool } from "@/lib/mcp-client-gdrive";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -11,7 +11,7 @@ export async function POST(request) {
     const { messages } = await request.json();
 
     // Get MCP tools
-    const tools = await getMCPTools();
+    const tools = await getGDriveMCPTools();
 
     // Call Claude with tools
     let response = await anthropic.messages.create({
@@ -26,7 +26,7 @@ export async function POST(request) {
       const toolUse = response.content.find((c) => c.type === "tool_use");
 
       // Execute tool via MCP
-      const toolResult = await callMCPTool(toolUse.name, toolUse.input);
+      const toolResult = await callGDriveMCPTool(toolUse.name, toolUse.input);
 
       // Continue conversation with tool result
       response = await anthropic.messages.create({

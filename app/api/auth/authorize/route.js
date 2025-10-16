@@ -16,8 +16,9 @@ export async function GET(request) {
     const credentials = JSON.parse(fs.readFileSync(clientSecretPath, "utf8"));
     const { client_secret, client_id, redirect_uris } = credentials.installed;
 
-    // For Desktop app, we need to use a redirect URI that works with localhost
-    // Desktop apps accept http://localhost on any port
+
+    //  TODO: might need to change the app to "webapp" --> google cloud console thing that needs to change
+    // Desktop apps accept http://localhost on any port 
     const redirectUri = "http://localhost:3000/api/auth/callback";
 
     // Create OAuth2 client
@@ -31,7 +32,7 @@ export async function GET(request) {
     const authUrl = oauth2Client.generateAuthUrl({
       access_type: "offline",
       scope: SCOPES,
-      prompt: "consent", // Force consent screen to get refresh token
+      prompt: "consent",
     });
 
     // Redirect to Google's OAuth consent screen
