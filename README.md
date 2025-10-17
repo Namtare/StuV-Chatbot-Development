@@ -52,6 +52,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 - able to upload files (pdf, txt, docx)
 - section for VectorDB --> might even Need to switch from MCP to VectorDB entirely because of Efficiency + length limitations on prompt
 - [once we get a google Cloud project] different Groups can see different parts of the same Google Cloud
+- [For Vector-Database] create a webinterface in which you can upload your pdfs to add to the DB
 
 ### Project changes when going prod
 - different application type (from desktop-app to webapp)
