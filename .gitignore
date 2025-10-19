@@ -43,3 +43,38 @@ token.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# virtual environment
+venv/
+
+# byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# dotenv
+.env
+
+# python build
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# project caches
+.cache/
+.mypy_cache/
+.pytest_cache/
+
+# data / model artifacts (optional)
+data/
+models/
+embeddings/
+logs/
+
+# Test Milvus
+*.db
+volumes/
