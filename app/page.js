@@ -5,30 +5,28 @@ import { useState } from "react";
 
 export default function Home() {
   const [inputValue, setInputValue] = useState("");
-  const [claudeResponse, setClaudeResponse] = useState("");
+  const [response, setResponse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const callClaudeAPI = async () => {
+  const callOllamaAPI = async () => {
     setIsLoading(true);
-    setClaudeResponse("");
+    setResponse("");
 
     try {
-      const response = await fetch("/api/claude/", {
+      const apiResponse = await fetch("/api/ollama/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-5-20250929",
-          max_tokens: 1024,
           messages: [{ role: "user", content: inputValue }],
         }),
       });
 
-      const data = await response.json();
-      setClaudeResponse(data.content[0].text);
+      const data = await apiResponse.json();
+      setResponse(data.content[0].text);
     } catch (error) {
-      setClaudeResponse("Error: " + error.message);
+      setResponse("Error: " + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -55,19 +53,19 @@ export default function Home() {
           />
         </div>
         <button
-          onClick={callClaudeAPI}
+          onClick={callOllamaAPI}
           disabled={isLoading || !inputValue}
           className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-300"
           style={{ marginTop: "20px" }}
-        >about:blank#blocked
-          {isLoading ? "Loading..." : "Ask Claude"}
+        >
+          {isLoading ? "Loading..." : "Ask Ollama"}
         </button>
       </div>
 
-      {claudeResponse && (
+      {response && (
         <div className="mt-4 p-4 bg-gray-100 rounded">
-          <h3 className="font-bold mb-2">Claude's Response:</h3>
-          <p>{claudeResponse}</p>
+          <h3 className="font-bold mb-2">Ollama Response (gpt-oss:20b):</h3>
+          <p>{response}</p>
         </div>
       )}
     </div>

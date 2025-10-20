@@ -1,6 +1,6 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
-## Getting Started
+## Getting Started (without Ollama)
 
 First, run the development server:
 
@@ -20,36 +20,27 @@ You can start editing the page by modifying `app/page.js`. The page auto-updates
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+## Getting Ollama to work
 
-To learn more about Next.js, take a look at the following resources:
+Prerequisits:
+- docker
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Follow the steps in `README.md` in ./ollama/ to start ollama locally and installing gpt-oss 20B locally. Then just run the application with `npm run dev` and you can chat with gpt-oss 20B. The response times are a little higher 30-40seconds (will be adressed in future updates).
 
 
 ## Planning
 
 ### TODOs
-- update readme for developers to help (env-configuration, API-key access, authorization before )
+- configure the call to Ollama (done)
+- assess the speed of request (make it visible to user / make visible how much resources are used -> can we put it on a GPU instead of a CPU)
+- make ollama (gpt-oss 20B) accessable to MCP-tools
 - make the authorization process aka. generating token requirement on app-start-up 
 (get send to http://localhost:3000/api/auth/callback 
 --> http://localhost:3000) or whatever URL will be used later.
-- the client-secret + token.js Need to be saved in a different way (other .env --> make it more usable for new ppl)
-- delete the example-stuff (is in git-history, if someone wants to Play around with that)
-- configure the call to Ollama / gemini
+- check gemini-option (cost-wise and maybe more benefits with student subscription) (done)
 - update UI-interface (Needs to include visual Chat history + ability to reference previous Chat Messages)
 
 ### Features To Add
-- able to upload files (pdf, txt, docx)
 - section for VectorDB --> might even Need to switch from MCP to VectorDB entirely because of Efficiency + length limitations on prompt
 - [once we get a google Cloud project] different Groups can see different parts of the same Google Cloud
 - [For Vector-Database] create a webinterface in which you can upload your pdfs to add to the DB

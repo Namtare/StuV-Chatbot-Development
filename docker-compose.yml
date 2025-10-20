@@ -1,0 +1,23 @@
+services:
+  ollama:
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    container_name: ollama-server
+    ports:
+      - "11434:11434"
+    environment:
+      - MODEL_NAME=gpt-oss:20b
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+    driver: local
