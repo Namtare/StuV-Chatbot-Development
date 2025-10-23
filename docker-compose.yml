@@ -7,7 +7,7 @@ services:
     ports:
       - "11434:11434"
     environment:
-      - MODEL_NAME=gpt-oss:20b
+      - MODEL_NAME=llama3.1:8b
     volumes:
       - ollama-data:/root/.ollama
     restart: unless-stopped

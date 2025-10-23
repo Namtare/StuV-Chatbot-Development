@@ -8,9 +8,9 @@ export async function POST(req) {
     // Ollama API endpoint
     const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
 
-    // Format the request for Ollama's chat API - hardcoded to gpt-oss 20B
+    // Format the request for Ollama's chat API
     const ollamaRequest = {
-      model: "gpt-oss:20b",
+      model: "llama3.1:8b",
       messages: messages || [
         {
           role: "user",
