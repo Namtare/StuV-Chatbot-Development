@@ -19,7 +19,7 @@ docker-compose up -d
 This will:
 - Build the Ollama Docker image
 - Start the Ollama server on port 11434
-- Automatically pull the `gpt-oss:20b` model (this may take a while on first run 13GB)
+- Automatically pull the `llama3.1:8b` model (this may take a while on first run 13GB)
 - Persist the model data in a Docker volume
 
 ## Usage
