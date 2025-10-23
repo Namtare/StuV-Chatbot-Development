@@ -1,22 +1,21 @@
 #!/bin/bash
-
-# Start Ollama in the background
+echo "Starting Ollama server..."
 /bin/ollama serve &
-
-# Wait for Ollama to be ready
+OLLAMA_PID=$!
 echo "Waiting for Ollama service to be ready..."
-until curl -s http://localhost:11434/api/tags > /dev/null 2>&1; do
-    sleep 1
-done
-
+sleep 5
 echo "Ollama service is ready!"
-
-# Pull the model if MODEL_NAME is set
-if [ ! -z "$MODEL_NAME" ]; then
-    echo "Pulling model: $MODEL_NAME"
-    ollama pull $MODEL_NAME
-    echo "Model $MODEL_NAME is ready!"
+if [ -n "$MODEL_NAME" ]; then
+    echo "Checking if model $MODEL_NAME exists..."
+    if ! ollama list | grep -q "$MODEL_NAME"; then
+        echo "Model not found. Pulling model: $MODEL_NAME"
+        ollama pull "$MODEL_NAME"
+        echo "Model $MODEL_NAME is ready!"
+    else
+        echo "Model $MODEL_NAME already exists, skipping download."
+    fi
+else
+    echo "No MODEL_NAME specified, skipping model pull."
 fi
-
-# Keep the container running
-wait
+echo "Ollama is ready to accept requests."
+wait $OLLAMA_PID
