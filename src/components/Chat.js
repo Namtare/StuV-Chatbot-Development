@@ -55,15 +55,48 @@ export default function ChatWindow() {
     setMessages((m) => [...m, userMsg]);
 
     setSending(true);
-    await new Promise((r) => setTimeout(r, 600));
-    const reply = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content:
-        'Nice message! Replace this with your API call and stream tokens here.',
-    };
-    setMessages((m) => [...m, reply]);
-    setSending(false);
+
+    try {
+      // Build message history for context (send all previous messages)
+      const messageHistory = [...messages, userMsg].map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      const response = await fetch('/api/ollama', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: messageHistory
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      const reply = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.content[0].text,
+      };
+
+      setMessages((m) => [...m, reply]);
+    } catch (error) {
+      console.error('Error calling Ollama API:', error);
+      const errorMsg = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.',
+      };
+      setMessages((m) => [...m, errorMsg]);
+    } finally {
+      setSending(false);
+    }
   }
 
   return (

@@ -4,7 +4,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { getDriveClient } from "../app/lib/google-drive-auth.js";
+import { getDriveClient } from "../src/lib/google-drive-auth.js";
 
 // Initialize Drive client
 let drive = null;

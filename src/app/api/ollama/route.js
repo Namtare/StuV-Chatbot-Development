@@ -1,53 +1,35 @@
 import { NextResponse } from "next/server";
+import { orchestrateLLMConversation } from "@/lib/llm-orchestration";
 
 export async function POST(req) {
   try {
     const body = await req.json();
     const { model, prompt, messages } = body;
 
-    // Ollama API endpoint
-    const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-
-    // Format the request for Ollama's chat API
-    const ollamaRequest = {
-      model: "llama3.1:8b",
-      messages: messages || [
-        {
-          role: "user",
-          content: prompt || body.content || "",
-        },
-      ],
-      stream: false,
-    };
-
-    const response = await fetch(`${ollamaUrl}/api/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    // Format messages
+    const conversationMessages = messages || [
+      {
+        role: "user",
+        content: prompt || body.content || "",
       },
-      body: JSON.stringify(ollamaRequest),
+    ];
+
+    // Orchestrate the conversation with tool calling support
+    const result = await orchestrateLLMConversation(conversationMessages, {
+      model: model || "llama3.1:8b",
     });
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
 
     return NextResponse.json({
       content: [
         {
-          text: data.message.content,
+          text: result.content,
         },
       ],
-      model: data.model,
-      usage: {
-        prompt_tokens: data.prompt_eval_count || 0,
-        completion_tokens: data.eval_count || 0,
-      },
+      model: result.model,
+      usage: result.usage,
     });
   } catch (error) {
-    console.error("Error calling Ollama:", error);
+    console.error("Error in LLM orchestration:", error);
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
