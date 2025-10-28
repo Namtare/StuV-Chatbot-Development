@@ -57,3 +57,8 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ### Project changes when going prod
 - different application type (from desktop-app to webapp)
 - might Need to Change the Transport between Server and Client (from stdio to http) depending on where Servers will live (apart from or together with Node-app)
+
+# Milvus
+- Dockerfile to create a milvus container
+- Install requirements.txt
+- milvus_pdf.py: Takes all PDFs stored in directory ./pdf, checks for new pdfs and creates embedding stored in collection (new collections can be used when changing config details)
