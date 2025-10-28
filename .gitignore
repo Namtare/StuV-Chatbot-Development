@@ -78,3 +78,6 @@ logs/
 # Test Milvus
 *.db
 volumes/
+pdf
+/milvus_test.py
+/milvus_ollama.py
