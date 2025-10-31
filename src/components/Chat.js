@@ -25,17 +25,18 @@ import {
 
 export default function ChatWindow() {
   const [messages, setMessages] = useState([
-    {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: 'Philip bitte mach jetzt',
-    },
-    { id: crypto.randomUUID(), role: 'user', content: 'Ja mache ich!.' },
-    {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: 'Danke wenn was ist melde dich',
-    },
+    // {
+    //   id: crypto.randomUUID(),
+
+    //   role: 'assistant',
+    //   content: 'Philip bitte mach jetzt',
+    // },
+    // { id: crypto.randomUUID(), role: 'user', content: 'Ja mache ich!.' },
+    // {
+    //   id: crypto.randomUUID(),
+    //   role: 'assistant',
+    //   content: 'Danke wenn was ist melde dich',
+    // },
   ]);
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);

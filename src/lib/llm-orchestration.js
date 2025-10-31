@@ -11,7 +11,7 @@ import { getGDriveMCPTools, callGDriveMCPTool } from './mcp-client-gdrive.js';
  */
 export async function orchestrateLLMConversation(messages, options = {}) {
   const ollamaUrl = options.ollamaUrl || process.env.OLLAMA_URL || "http://localhost:11434";
-  const model = options.model || "llama3.1:8b";
+  const model = options.model || "llama3.2:3b";
   const maxIterations = options.maxIterations || 10;
 
   // Get available MCP tools from Google Drive server
@@ -48,7 +48,11 @@ export async function orchestrateLLMConversation(messages, options = {}) {
       model,
       messages: conversationMessages,
       tools: ollamaTools.length > 0 ? ollamaTools : undefined,
-      stream: false
+      stream: false,
+      options:{
+        num_predict:200,
+        temperature:0.7
+      }
     });
 
     // Track token usage

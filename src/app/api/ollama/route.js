@@ -16,7 +16,7 @@ export async function POST(req) {
 
     // Orchestrate the conversation with tool calling support
     const result = await orchestrateLLMConversation(conversationMessages, {
-      model: model || "llama3.1:8b",
+      model: model || "llama3.2:3b",
     });
 
     return NextResponse.json({
