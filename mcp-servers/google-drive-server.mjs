@@ -42,7 +42,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "list_drive_files",
         description:
-          "List files in Google Drive. Optionally filter by folder ID, search query, or file type.",
+          "List files in Google Drive. This is the primary tool to discover files and obtain their IDs. Use this FIRST before calling get_file_metadata or read_file_content. Optionally filter by folder ID, search query, or file type. Returns file IDs that can be used with other tools.",
         inputSchema: {
           type: "object",
           properties: {
@@ -67,13 +67,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "get_file_metadata",
         description:
-          "Get detailed metadata for a specific file by its ID, including name, size, modified time, and MIME type.",
+          "Get detailed metadata for a specific file by its ID, including name, size, modified time, and MIME type. IMPORTANT: You must call 'list_drive_files' or 'search_files' first to obtain valid file IDs before using this tool.",
         inputSchema: {
           type: "object",
           properties: {
             fileId: {
               type: "string",
-              description: "The Google Drive file ID",
+              description: "The Google Drive file ID (obtain this from list_drive_files or search_files first)",
             },
           },
           required: ["fileId"],
@@ -82,13 +82,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "read_file_content",
         description:
-          "Read the content of a file from Google Drive. Works with text files, Google Docs, Sheets, and other exportable formats.",
+          "Read the content of a file from Google Drive. Works with text files, Google Docs, Sheets, and other exportable formats. IMPORTANT: You must call 'list_drive_files' or 'search_files' first to obtain valid file IDs before using this tool.",
         inputSchema: {
           type: "object",
           properties: {
             fileId: {
               type: "string",
-              description: "The Google Drive file ID",
+              description: "The Google Drive file ID (obtain this from list_drive_files or search_files first)",
             },
             mimeType: {
               type: "string",
@@ -102,7 +102,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "search_files",
         description:
-          "Search for files in Google Drive using advanced search queries.",
+          "Search for files in Google Drive using advanced search queries. Searches in both file names and content. Returns file IDs that can be used with get_file_metadata or read_file_content.",
         inputSchema: {
           type: "object",
           properties: {
@@ -195,6 +195,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === "get_file_metadata") {
       const fileId = args.fileId;
 
+      // Validate fileId
+      if (!fileId || fileId === "None" || fileId === "null" || fileId === "undefined" || fileId.trim() === "") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Error: Invalid file ID provided. You must first call 'list_drive_files' or 'search_files' to get valid file IDs, then use one of those IDs with this tool.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
       const response = await drive.files.get({
         fileId,
         fields:
@@ -213,6 +226,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     if (name === "read_file_content") {
       const fileId = args.fileId;
+
+      // Validate fileId
+      if (!fileId || fileId === "None" || fileId === "null" || fileId === "undefined" || fileId.trim() === "") {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Error: Invalid file ID provided. You must first call 'list_drive_files' or 'search_files' to get valid file IDs, then use one of those IDs with this tool.",
+            },
+          ],
+          isError: true,
+        };
+      }
 
       // First, get file metadata to determine if it's a Google Workspace file
       const metadata = await drive.files.get({

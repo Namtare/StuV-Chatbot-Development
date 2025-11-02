@@ -37,16 +37,8 @@ export async function GET(request) {
     const tokenPath = path.join(process.cwd(), "token.json");
     fs.writeFileSync(tokenPath, JSON.stringify(tokens));
 
-    // Redirect to success page or return success message
-    return NextResponse.json({
-      success: true,
-      message: "Authorization successful! You can close this window.",
-      tokens: {
-        access_token: tokens.access_token ? "✓" : "✗",
-        refresh_token: tokens.refresh_token ? "✓" : "✗",
-        expiry_date: tokens.expiry_date,
-      },
-    });
+    // Redirect to chat page after successful authorization
+    return NextResponse.redirect(new URL('/chat', request.url));
   } catch (error) {
     console.error("OAuth callback error:", error);
     return NextResponse.json(
