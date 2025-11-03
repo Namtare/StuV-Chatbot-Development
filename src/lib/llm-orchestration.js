@@ -1,5 +1,20 @@
 import { getGDriveMCPTools, callGDriveMCPTool } from './mcp-client-gdrive.js';
 
+const SYSTEM_PROMPT = `You are an AI assistant with access to tools.
+
+CRITICAL RULES:
+- You MUST use tools to complete tasks, never just explain how to do them
+- NEVER provide code snippets or scripts to the user
+- NEVER say "you can use" or "here's how you could"
+- ALWAYS execute the task using available tools
+- Do NOT respond until the task is 100% complete
+- If you explain instead of executing, you have FAILED
+
+When the user asks you to do something:
+1. Immediately call the appropriate tool
+2. Continue calling tools until complete
+3. Only then provide the final result`;
+
 /**
  * Orchestrates a conversation with Ollama LLM, handling tool calling via MCP.
  * Implements an agentic loop where the LLM can request tools, we execute them,
@@ -33,7 +48,11 @@ export async function orchestrateLLMConversation(messages, options = {}) {
     }
   }));
 
-  let conversationMessages = [...messages];
+  // Inject system prompt at the beginning of the conversation
+  let conversationMessages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...messages
+  ];
   let iterations = 0;
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
