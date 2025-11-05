@@ -3,13 +3,15 @@ import { MilvusClient, DataType } from '@zilliz/milvus2-sdk-node';
 // Milvus connection configuration
 const MILVUS_CONFIG = {
   address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-  username: 'minioadmin',
-  password: 'minioadmin',
+  username: process.env.MILVUS_USERNAME,
+  password: process.env.MILVUS_PASSWORD,
   ssl: false,
 };
 
 // Collection configuration
 const COLLECTION_NAME = 'first_collection';
+
+// will depend on the embedding model used
 const VECTOR_DIM = 128;
 
 // Schema definition
@@ -57,7 +59,10 @@ function getClient() {
  * @param {boolean} dropIfExists - Whether to drop the collection if it already exists
  * @returns {Promise<Object>} Result of collection creation
  */
-export async function createCollection(collectionName = COLLECTION_NAME, dropIfExists = false) {
+export async function createCollection(
+  collectionName = COLLECTION_NAME,
+  dropIfExists = false
+) {
   const milvusClient = getClient();
 
   // Check if collection exists
