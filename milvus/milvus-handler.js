@@ -22,8 +22,13 @@ const SCHEMA = [
     is_primary_key: true,
     auto_id: false,
   },
-  { name: 'page', data_type: DataType.Int32 },
   { name: 'fileID', data_type: DataType.VarChar, max_length: 100 },
+  { name: 'filename', data_type: DataType.VarChar, max_length: 255 },
+  { name: 'file_hash', data_type: DataType.VarChar, max_length: 32 }, // MD5 hash
+  { name: 'page', data_type: DataType.Int32 },
+  { name: 'chunk_index', data_type: DataType.Int32 },
+  { name: 'chunk_text', data_type: DataType.VarChar, max_length: 8000 },
+  { name: 'summary', data_type: DataType.VarChar, max_length: 2000 },
   { name: 'location', data_type: DataType.VarChar, max_length: 255 },
   { name: 'chunk', data_type: DataType.FloatVector, dim: VECTOR_DIM },
 ];
@@ -156,7 +161,7 @@ export async function ingestData(data, collectionName = COLLECTION_NAME) {
 export async function search(
   queryVector,
   limit = 5,
-  outputFields = ['fileID', 'location', 'page'],
+  outputFields = ['fileID', 'filename', 'page', 'chunk_index', 'chunk_text', 'summary', 'location'],
   collectionName = COLLECTION_NAME
 ) {
   const milvusClient = getClient();

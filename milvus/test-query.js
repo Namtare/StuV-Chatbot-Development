@@ -37,7 +37,7 @@ async function testQuery() {
     const results = await search(
       queryVector,
       5, // Get top 5 results
-      ['chunk_id', 'fileID', 'location', 'page'],
+      ['fileID', 'filename', 'file_hash', 'page', 'chunk_index', 'chunk_text', 'summary', 'location'],
       'first_collection'
     );
 
@@ -45,10 +45,14 @@ async function testQuery() {
     if (results.results && results.results.length > 0) {
       results.results.forEach((result, index) => {
         console.log(`\nResult ${index + 1}:`);
-        console.log(`  chunk_id: ${result.chunk_id}`);
         console.log(`  fileID: ${result.fileID}`);
-        console.log(`  location: ${result.location}`);
+        console.log(`  filename: ${result.filename}`);
+        console.log(`  file_hash: ${result.file_hash}`);
         console.log(`  page: ${result.page}`);
+        console.log(`  chunk_index: ${result.chunk_index}`);
+        console.log(`  chunk_text: ${result.chunk_text}`);
+        console.log(`  summary: ${result.summary}`);
+        console.log(`  location: ${result.location}`);
         console.log(`  similarity score: ${result.score}`);
 
         // Check if we found the test entity

@@ -15,10 +15,15 @@ When the Milvus Docker container starts, it automatically:
 
 The test entity ingested during startup:
 
-- **chunk_id**: 999
+- **chunk_id**: 1
 - **fileID**: TEST_ENTITY_001
-- **location**: test/data/test-document.pdf
+- **filename**: test-document.pdf
+- **file_hash**: d41d8cd98f00b204e9800998ecf8427e (MD5 hash example)
 - **page**: 1
+- **chunk_index**: 0
+- **chunk_text**: "This is a test chunk of text from the test document."
+- **summary**: "Test document summary for verification purposes."
+- **location**: https://drive.google.com/file/d/TEST_ENTITY_001/view
 - **vector pattern**: First 64 dimensions = 0.5, Last 64 dimensions = 0.8
 
 ## Files
@@ -33,26 +38,42 @@ The test entity ingested during startup:
 
 ## Usage
 
-### Start the Milvus container
+### Start the Milvus services
 
 ```bash
-docker-compose up --build standalone
+# Start etcd, minio, and milvus-standalone
+docker-compose up -d etcd minio standalone
+
+# Wait for services to be healthy (~30 seconds)
+docker-compose ps
 ```
 
-The container will automatically create the collection and ingest the test entity.
+### Initialize the database
+
+Run the initialization script to create the collection and ingest test data:
+
+```bash
+# Run the milvus-init container
+docker-compose up milvus-init
+```
+
+Or run the initialization manually:
+
+```bash
+# Install dependencies (first time only)
+cd milvus && npm install
+
+# Run initialization
+node init-milvus.js
+```
 
 ### Verify the database is working
 
-Run the test query script inside the container:
+Run the test query script:
 
 ```bash
-docker exec milvus-standalone node /app/test-query.js
-```
-
-Or using npm:
-
-```bash
-docker exec milvus-standalone npm run test:query
+cd milvus
+node test-query.js
 ```
 
 ### Expected output
@@ -65,31 +86,33 @@ Vector database is working correctly.
 Milvus is ready for production use.
 ```
 
-### Re-run initialization manually
+### Re-run test ingestion
 
-If you need to re-initialize:
-
-```bash
-docker exec milvus-standalone node /app/init-milvus.js
-```
-
-Or:
+If you need to re-ingest test data:
 
 ```bash
-docker exec milvus-standalone npm run init
+cd milvus
+node test-ingest.js
 ```
+
+This will drop and recreate the collection, then ingest the test entity.
 
 ## Schema
 
 The collection uses the following schema:
 
-| Field    | Type         | Description               |
-| -------- | ------------ | ------------------------- |
-| chunk_id | Int64        | Primary key               |
-| page     | Int32        | Page number               |
-| fileID   | VarChar(100) | Document identifier       |
-| location | VarChar(255) | Document location/path    |
-| chunk    | FloatVector  | 128-dimensional embedding |
+| Field       | Type          | Description                                      |
+| ----------- | ------------- | ------------------------------------------------ |
+| chunk_id    | Int64         | Primary key (auto_id: false, must be provided)  |
+| fileID      | VarChar(100)  | Google Drive file ID                             |
+| filename    | VarChar(255)  | Human-readable filename                          |
+| file_hash   | VarChar(32)   | MD5 hash for change detection                    |
+| page        | Int32         | Page number in the document                      |
+| chunk_index | Int32         | Chunk index within the page (0-based)            |
+| chunk_text  | VarChar(8000) | Actual text content of the chunk                 |
+| summary     | VarChar(2000) | Per-page summary                                 |
+| location    | VarChar(255)  | Google Drive link (webViewLink)                  |
+| chunk       | FloatVector   | 128-dimensional embedding vector                 |
 
 ## Vector Index
 

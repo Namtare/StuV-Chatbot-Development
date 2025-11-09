@@ -26,19 +26,28 @@ async function initializeMilvus() {
     ];
 
     const testEntity = {
-      chunk_id: 999,
-      page: 1,
+      chunk_id: 1,
       fileID: 'TEST_ENTITY_001',
-      location: 'test/data/test-document.pdf',
+      filename: 'test-document.pdf',
+      file_hash: 'd41d8cd98f00b204e9800998ecf8427e', // MD5 hash example
+      page: 1,
+      chunk_index: 0,
+      chunk_text: 'This is a test chunk of text from the test document.',
+      summary: 'Test document summary for verification purposes.',
+      location: 'https://drive.google.com/file/d/TEST_ENTITY_001/view',
       chunk: testVector,
     };
 
     console.log('\n[2/3] Ingesting test entity...');
     console.log('Test entity details:');
-    console.log(`  - chunk_id: ${testEntity.chunk_id}`);
     console.log(`  - fileID: ${testEntity.fileID}`);
-    console.log(`  - location: ${testEntity.location}`);
+    console.log(`  - filename: ${testEntity.filename}`);
+    console.log(`  - file_hash: ${testEntity.file_hash}`);
     console.log(`  - page: ${testEntity.page}`);
+    console.log(`  - chunk_index: ${testEntity.chunk_index}`);
+    console.log(`  - chunk_text: ${testEntity.chunk_text}`);
+    console.log(`  - summary: ${testEntity.summary}`);
+    console.log(`  - location: ${testEntity.location}`);
     console.log(`  - vector dimension: ${testVector.length}`);
     console.log(`  - vector pattern: first half=0.5, second half=0.8`);
 

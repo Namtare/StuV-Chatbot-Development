@@ -57,7 +57,7 @@ export async function POST(req) {
         result = await search(
           params.queryVector,
           params.limit || 5,
-          params.outputFields || ["fileID", "location", "page"],
+          params.outputFields || ["fileID", "filename", "page", "chunk_index", "chunk_text", "summary", "location"],
           params.collectionName || COLLECTION_NAME
         );
 

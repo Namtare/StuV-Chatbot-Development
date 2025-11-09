@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -42,6 +42,10 @@ next-env.d.ts
 
 # docker volumes
 /volumes
+
+# milvus local dependencies (used only in Docker)
+milvus/node_modules
+milvus/package-lock.json
 
 token.json
 client_secret.json
