@@ -4,7 +4,6 @@ import {
   getCollectionStats,
   VECTOR_DIM,
 } from './milvus-handler.js';
-// TODO: port the pdf embedding stuff from milvus branch.
 /**
  * Initialization script that creates collection and ingests a test entity
  * This runs automatically when the Milvus Docker container starts
@@ -13,12 +12,17 @@ async function initializeMilvus() {
   try {
     console.log('=== Milvus Initialization Started ===\n');
 
-    // Step 1: Create collection
+    // Create collection
     console.log('[1/3] Creating collection...');
-    const createResult = await createCollection('first_collection', true);
+    const createResult = await createCollection('test', true);
+
+    if (!createResult.success) {
+      throw new Error(`Collection creation failed: ${createResult.message}`);
+    }
+
     console.log(`✓ ${createResult.message}`);
 
-    // Step 2: Create a test entity with a predictable vector
+    // Create a test entity with a predictable vector
     // Using a simple pattern: first half is 0.5, second half is 0.8
     const testVector = [
       ...Array(VECTOR_DIM / 2).fill(0.5),
@@ -51,16 +55,44 @@ async function initializeMilvus() {
     console.log(`  - vector dimension: ${testVector.length}`);
     console.log(`  - vector pattern: first half=0.5, second half=0.8`);
 
-    const ingestResult = await ingestData([testEntity], 'first_collection');
+    const ingestResult = await ingestData([testEntity], 'test');
+
+    // Validate ingestion result
+    if (!ingestResult.success) {
+      throw new Error(`Data ingestion failed: ${ingestResult.message}`);
+    }
+
+    if (!ingestResult.insertCount || ingestResult.insertCount === 0) {
+      throw new Error(
+        `Data ingestion returned 0 entities. Expected 1 entity to be inserted. ` +
+        `This indicates the insertion failed silently.`
+      );
+    }
+
     console.log(
       `✓ Successfully ingested ${ingestResult.insertCount} test entity`
     );
 
-    // Step 3: Verify collection stats
+    // Verify collection stats
     console.log('\n[3/3] Verifying collection...');
-    const stats = await getCollectionStats('first_collection');
+    const stats = await getCollectionStats('test');
+    const rowCount = stats.data?.row_count;
+
     console.log('Collection statistics:');
-    console.log(`  - Row count: ${stats.data?.row_count || 'N/A'}`);
+    console.log(`  - Row count: ${rowCount || 'N/A'}`);
+
+    // Verify the row count matches
+    if (rowCount === undefined || rowCount === null) {
+      throw new Error('Unable to retrieve collection row count');
+    }
+
+    if (rowCount === 0) {
+      throw new Error(
+        'Collection has 0 rows after ingestion. Data was not persisted correctly.'
+      );
+    }
+
+    console.log(`✓ Verified: Collection contains ${rowCount} entity (as expected)`);
 
     console.log('\n=== Milvus Initialization Completed Successfully ===');
     console.log('✓ Test entity is ready for querying');

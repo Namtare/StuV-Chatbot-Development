@@ -1,18 +1,21 @@
 import { MilvusClient, DataType } from '@zilliz/milvus2-sdk-node';
 
 // Milvus connection configuration
+const MILVUS_HOST = process.env.MILVUS_HOST || 'localhost';
+const MILVUS_PORT = process.env.MILVUS_PORT || '19530';
+
 const MILVUS_CONFIG = {
-  address: process.env.MILVUS_ADDRESS || 'localhost:19530',
+  address: `${MILVUS_HOST}:${MILVUS_PORT}`,
   username: process.env.MILVUS_USERNAME,
   password: process.env.MILVUS_PASSWORD,
   ssl: false,
 };
 
-// Collection configuration
-const COLLECTION_NAME = 'first_collection';
+// Collection configuration from environment
+const COLLECTION_NAME = process.env.COLLECTION_NAME || 'test';
 
-// will depend on the embedding model used
-const VECTOR_DIM = 128;
+// Vector dimension depends on the embedding model used (all-MiniLM-L6-v2)
+const VECTOR_DIM = parseInt(process.env.EMBEDDING_DIM || '384', 10);
 
 // Schema definition
 const SCHEMA = [

@@ -7,7 +7,7 @@ This directory contains the Docker configuration and initialization scripts for 
 When the Milvus Docker container starts, it automatically:
 
 1. Starts the Milvus server
-2. Creates a collection with the predefined schema
+2. Creates a collection named `'test'` with the predefined schema
 3. Ingests a test entity with a predictable vector pattern
 4. Verifies the collection is ready
 
@@ -24,7 +24,7 @@ The test entity ingested during startup:
 - **chunk_text**: "This is a test chunk of text from the test document."
 - **summary**: "Test document summary for verification purposes."
 - **location**: https://drive.google.com/file/d/TEST_ENTITY_001/view
-- **vector pattern**: First 64 dimensions = 0.5, Last 64 dimensions = 0.8
+- **vector pattern**: First 192 dimensions = 0.5, Last 192 dimensions = 0.8
 
 ## Files
 
@@ -112,10 +112,43 @@ The collection uses the following schema:
 | chunk_text  | VarChar(8000) | Actual text content of the chunk                 |
 | summary     | VarChar(2000) | Per-page summary                                 |
 | location    | VarChar(255)  | Google Drive link (webViewLink)                  |
-| chunk       | FloatVector   | 128-dimensional embedding vector                 |
+| chunk       | FloatVector   | 384-dimensional embedding vector (all-MiniLM-L6-v2) |
 
 ## Vector Index
 
+- **Collection name**: `test`
 - **Index type**: HNSW
 - **Metric**: COSINE similarity
 - **Parameters**: M=16, efConstruction=200
+- **Vector dimension**: 384 (using all-MiniLM-L6-v2 embedding model)
+
+## PDF Ingestion Pipeline
+
+A Python script is available to ingest PDF documents into the Milvus collection.
+
+### Prerequisites
+
+Install Python dependencies:
+
+```bash
+pip install pymilvus langchain-text-splitters sentence-transformers PyPDF2
+```
+
+### Usage
+
+1. Place PDF files in the `./pdf` directory (relative to project root)
+2. Ensure Milvus is running and the `'test'` collection has been initialized
+3. Run the ingestion script:
+
+```bash
+python scripts-milvus/milvus-pdf.py
+```
+
+### Features
+
+- **Automatic chunking**: Splits PDFs into 1000-character chunks with 100-character overlap
+- **Page tracking**: Maintains page numbers for each chunk
+- **Deduplication**: Uses MD5 hashing to skip unchanged files
+- **Auto-update**: Re-ingests modified PDFs automatically
+- **Sequential IDs**: Generates non-conflicting chunk_id values
+- **Full schema population**: Populates all required fields including fileID, page, chunk_index, summary, and location
