@@ -13,14 +13,25 @@ async function initializeMilvus() {
     console.log('=== Milvus Initialization Started ===\n');
 
     // Create collection
-    console.log('[1/3] Creating collection...');
+    console.log('[1/3] Creating collections...');
+    console.log("creating testing collecion (chunk data)")
     const createResult = await createCollection('test', true);
 
     if (!createResult.success) {
-      throw new Error(`Collection creation failed: ${createResult.message}`);
+      throw new Error(`Collection 'chunk information' creation failed: ${createResult.message}`);
     }
 
     console.log(`✓ ${createResult.message}`);
+
+
+    // create page-with-metadata collection
+    console.log("creating  page-meta-information collection (page-summaries)")
+    const createPageMeta = await createCollection("page_with_meta", true)
+    if (!createPageMeta.success) {
+      throw new Error(`Collection creation 'page_with_meta' creation failed: ${createPageMeta.message}`)
+    }
+
+    console.log(`✓ ${createPageMeta.message}`);
 
     // Create a test entity with a predictable vector
     // Using a simple pattern: first half is 0.5, second half is 0.8
@@ -65,7 +76,7 @@ async function initializeMilvus() {
     if (!ingestResult.insertCount || ingestResult.insertCount === 0) {
       throw new Error(
         `Data ingestion returned 0 entities. Expected 1 entity to be inserted. ` +
-        `This indicates the insertion failed silently.`
+        `The insertion failed silently.`
       );
     }
 
@@ -73,31 +84,75 @@ async function initializeMilvus() {
       `✓ Successfully ingested ${ingestResult.insertCount} test entity`
     );
 
+
+    // insert test entity for page-meta-information
+    const testPageMeta = {      
+      pageID: 1,
+      fileID: "TEST_ENTITY_1_page_meta",
+      localPageNum: 1,
+      summary:"Sample summary!"
+    }
+    console.log("Test entity page-meta details: ")
+    console.log(`  - pageID: ${testPAgeMeta.pageID}`);
+    console.log(`  - fileID: ${testPAgeMeta.fileID}`);
+    console.log(`  - localPageNum: ${testPAgeMeta.localPageNum}`);
+    console.log(`  - summary: ${testPAgeMeta.summary}`);
+
+    const ingestPageMeta = await ingestData([testPageMeta], 'page_with_meta');
+    
+    // Validate ingestion result
+    if (!ingestPageMeta.success) {
+      throw new Error(`Data ingestion failed: ${ingestPageMeta.message}`);
+    }
+
+    if (!ingestPageMeta.insertCount || ingestPageMeta.insertCount === 0) {
+      throw new Error(
+        `Data ingestion returned 0 entities for page-meta. Expected 1 entity to be inserted. ` +
+        `The insertion failed silently.`
+      );
+    }
+
+    console.log(
+      `✓ Successfully ingested ${ingestPageMeta.insertCount} test entity`
+    );
+
+
     // Verify collection stats
     console.log('\n[3/3] Verifying collection...');
     const stats = await getCollectionStats('test');
     const rowCount = stats.data?.row_count;
 
-    console.log('Collection statistics:');
-    console.log(`  - Row count: ${rowCount || 'N/A'}`);
+    const stats_page_meta = await getCollectionStats("page_with_meta");
+    const rowCountPageMeta = stats.data?.row_count;
 
+    console.log('Collection statistics:');
+    console.log(`  - Row count chunks: ${rowCount || 'N/A'}`);
+    console.log(`  - Row count pages: ${rowCountPageMeta || 'N/A'}`);
     // Verify the row count matches
     if (rowCount === undefined || rowCount === null) {
-      throw new Error('Unable to retrieve collection row count');
+      throw new Error('Unable to retrieve collection chunks row count');
+    }
+    if (rowCountPageMeta === undefined || rowCountPageMeta === null){
+      throw new Error("Unable to retrieve collection pages row count");
     }
 
     if (rowCount === 0) {
       throw new Error(
-        'Collection has 0 rows after ingestion. Data was not persisted correctly.'
+        'Collection chunks has 0 rows after ingestion. Data was not persisted correctly.'
       );
     }
+    if (rowCountPageMeta === 0){
+      throw new Error(
+        'Collection pages has 0 rows after ingestion. Data was not persisted correctly.'
+      )
+    }
 
-    console.log(`✓ Verified: Collection contains ${rowCount} entity (as expected)`);
-
+    console.log(`✓ Verified: Collection chunks contains ${rowCount} entity (as expected)`);
+    console.log(`✓ Verified: Collection chunks contains ${rowCountPageMeta} entity (as expected)`);
     console.log('\n=== Milvus Initialization Completed Successfully ===');
-    console.log('✓ Test entity is ready for querying');
+    console.log('✓ Test entities are ready for querying');
     console.log(
-      '✓ Run "docker exec milvus-standalone node /app/test-query.js" to verify\n'
+      '✓ Run "docker exec milvus-standalone node /app/test-query.js" to verify the chunk entity..\n'
     );
 
     process.exit(0);

@@ -28,14 +28,25 @@ const SCHEMA = [
   { name: 'fileID', data_type: DataType.VarChar, max_length: 100 },
   { name: 'filename', data_type: DataType.VarChar, max_length: 255 },
   { name: 'file_hash', data_type: DataType.VarChar, max_length: 32 }, // MD5 hash
-  { name: 'page', data_type: DataType.Int32 },
+  { name: 'page', data_type: DataType.VarChar, max_length: 200 },
   { name: 'chunk_index', data_type: DataType.Int32 },
   { name: 'chunk_text', data_type: DataType.VarChar, max_length: 8000 },
   { name: 'summary', data_type: DataType.VarChar, max_length: 2000 },
   { name: 'location', data_type: DataType.VarChar, max_length: 255 },
   { name: 'chunk', data_type: DataType.FloatVector, dim: VECTOR_DIM },
 ];
-
+const PAGE_SCHEMA = [
+  {
+    name: 'page_id',
+    data_type: DataType.VarChar,
+    max_length: 200,
+    is_primary_key: true,
+    auto_id: false,
+  },
+  { name: 'file_id', data_type: DataType.VarChar, max_length: 100 },
+  { name: 'local_page_num', data_type: DataType.Int32 },
+  { name: 'summary', data_type: DataType.VarChar, max_length: 500 }, // 300-400 chars + buffer
+];
 // Index configuration
 const INDEX_CONFIG = {
   field_name: 'chunk',
@@ -69,7 +80,8 @@ function getClient() {
  */
 export async function createCollection(
   collectionName = COLLECTION_NAME,
-  dropIfExists = false
+  dropIfExists = false,
+  schema = SCHEMA
 ) {
   const milvusClient = getClient();
 
@@ -90,6 +102,8 @@ export async function createCollection(
     }
   }
 
+  if (collectionNamme == 'test')
+{
   // Create collection
   console.log(`Creating collection '${collectionName}'...`);
   await milvusClient.createCollection({
@@ -104,6 +118,14 @@ export async function createCollection(
     collection_name: collectionName,
     ...INDEX_CONFIG,
   });
+}else{
+  console.log(`Creating collection '${collectionName}'...`)
+  await milvusClient.createCollection({
+    collection_name: collectionName,
+    description: "Collection for document pages and their summaries",
+    fields: PAGE_SCHEMA
+  });
+}
 
   console.log(`Collection '${collectionName}' created successfully.`);
   return { success: true, message: 'Collection created successfully' };
