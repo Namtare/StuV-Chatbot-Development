@@ -86,17 +86,24 @@ async function initializeMilvus() {
 
 
     // insert test entity for page-meta-information
-    const testPageMeta = {      
-      pageID: 1,
-      fileID: "TEST_ENTITY_1_page_meta",
-      localPageNum: 1,
-      summary:"Sample summary!"
+    const testSummaryVector = [
+      ...Array(VECTOR_DIM / 2).fill(0.3),
+      ...Array(VECTOR_DIM / 2).fill(0.7),
+    ];
+
+    const testPageMeta = {
+      page_id: "TEST_ENTITY_001_page_1",
+      file_id: "TEST_ENTITY_001",
+      local_page_num: 1,
+      summary: "Sample summary!",
+      summary_embedding: testSummaryVector
     }
     console.log("Test entity page-meta details: ")
-    console.log(`  - pageID: ${testPAgeMeta.pageID}`);
-    console.log(`  - fileID: ${testPAgeMeta.fileID}`);
-    console.log(`  - localPageNum: ${testPAgeMeta.localPageNum}`);
-    console.log(`  - summary: ${testPAgeMeta.summary}`);
+    console.log(`  - page_id: ${testPageMeta.page_id}`);
+    console.log(`  - file_id: ${testPageMeta.file_id}`);
+    console.log(`  - local_page_num: ${testPageMeta.local_page_num}`);
+    console.log(`  - summary: ${testPageMeta.summary}`);
+    console.log(`  - summary_embedding dimension: ${testSummaryVector.length}`);
 
     const ingestPageMeta = await ingestData([testPageMeta], 'page_with_meta');
     
@@ -123,7 +130,7 @@ async function initializeMilvus() {
     const rowCount = stats.data?.row_count;
 
     const stats_page_meta = await getCollectionStats("page_with_meta");
-    const rowCountPageMeta = stats.data?.row_count;
+    const rowCountPageMeta = stats_page_meta.data?.row_count;
 
     console.log('Collection statistics:');
     console.log(`  - Row count chunks: ${rowCount || 'N/A'}`);

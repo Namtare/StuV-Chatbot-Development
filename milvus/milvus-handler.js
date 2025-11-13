@@ -46,10 +46,21 @@ const PAGE_SCHEMA = [
   { name: 'file_id', data_type: DataType.VarChar, max_length: 100 },
   { name: 'local_page_num', data_type: DataType.Int32 },
   { name: 'summary', data_type: DataType.VarChar, max_length: 500 }, // 300-400 chars + buffer
+  { name: 'summary_embedding', data_type: DataType.FloatVector, dim: VECTOR_DIM }, // Required by Milvus
 ];
 // Index configuration
 const INDEX_CONFIG = {
   field_name: 'chunk',
+  index_type: 'HNSW',
+  metric_type: 'COSINE',
+  params: {
+    M: 16,
+    efConstruction: 200,
+  },
+};
+
+const PAGE_INDEX_CONFIG = {
+  field_name: 'summary_embedding',
   index_type: 'HNSW',
   metric_type: 'COSINE',
   params: {
@@ -102,7 +113,7 @@ export async function createCollection(
     }
   }
 
-  if (collectionNamme == 'test')
+  if (collectionName == 'test')
 {
   // Create collection
   console.log(`Creating collection '${collectionName}'...`);
@@ -124,6 +135,13 @@ export async function createCollection(
     collection_name: collectionName,
     description: "Collection for document pages and their summaries",
     fields: PAGE_SCHEMA
+  });
+
+  // Create index on summary vector field
+  console.log('Creating index on summary_embedding field...');
+  await milvusClient.createIndex({
+    collection_name: collectionName,
+    ...PAGE_INDEX_CONFIG,
   });
 }
 
@@ -237,4 +255,4 @@ export async function closeConnection() {
 }
 
 // Export configuration constants
-export { COLLECTION_NAME, VECTOR_DIM, SCHEMA };
+export { COLLECTION_NAME, VECTOR_DIM, SCHEMA, PAGE_SCHEMA, INDEX_CONFIG, PAGE_INDEX_CONFIG };

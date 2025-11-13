@@ -140,39 +140,44 @@ def insert_embeddings(collection, file_name, file_hash, chunks_data, embeddings,
     print(f"Inserted {num_chunks} chunks from '{file_name}' into Milvus.")
 
 
-def insert_page_summaries(page_collection, pages_data, existing_page_ids):
+def insert_page_summaries(page_collection, pages_data, existing_page_ids, model):
     """Insert page summaries into the page metadata collection."""
     # Filter out pages that already exist
     new_pages = [p for p in pages_data if p['page_id'] not in existing_page_ids]
-    
+
     if not new_pages:
         print("No new pages to summarize.")
         return
-    
+
     print(f"Generating summaries for {len(new_pages)} pages...")
-    
+
     page_ids = []
     file_ids = []
     local_page_nums = []
     summaries = []
-    
+
     for page_data in new_pages:
         # Generate summary using Claude
         summary = write_summary(page_data['page_text'])
-        
+
         page_ids.append(page_data['page_id'])
         file_ids.append(page_data['file_id'])
         local_page_nums.append(page_data['local_page_num'])
         summaries.append(summary)
-    
+
+    # Generate embeddings for the summaries
+    print(f"Generating embeddings for {len(summaries)} summaries...")
+    summary_embeddings = get_embeddings(summaries, model)
+
     # Insert into page collection
     entities = [
         page_ids,
         file_ids,
         local_page_nums,
-        summaries
+        summaries,
+        summary_embeddings
     ]
-    
+
     page_collection.insert(entities)
     print(f"Inserted {len(new_pages)} page summaries into {PAGE_COLLECTION_NAME}.")
 
@@ -244,10 +249,10 @@ def main():
 
         # Load PDF and get both chunks and page metadata
         chunks_data, pages_data = load_and_split_pdf(file_path, file_id)
-        
+
         # Insert page summaries FIRST (so they exist before chunks reference them)
-        insert_page_summaries(page_collection, pages_data, existing_page_ids)
-        
+        insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
+
         # Then insert chunks with embeddings
         chunk_texts = [chunk['text'] for chunk in chunks_data]
         embeddings = get_embeddings(chunk_texts, model)

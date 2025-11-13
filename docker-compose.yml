@@ -86,7 +86,10 @@ services:
       dockerfile: Dockerfile.init
     container_name: milvus-init
     environment:
-      - MILVUS_ADDRESS=milvus-standalone:19530
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
+      - COLLECTION_NAME=test
+      - EMBEDDING_DIM=384
     depends_on:
       standalone:
         condition: service_healthy
