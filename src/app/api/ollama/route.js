@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { orchestrateLLMConversation } from "@/lib/llm-orchestration";
+import { orchestrateMilvusHybridSearch } from "@/lib/milvus-orchestration";
 
 export async function POST(req) {
   try {
@@ -15,8 +16,12 @@ export async function POST(req) {
     ];
 
     // Orchestrate the conversation with tool calling support
-    const result = await orchestrateLLMConversation(conversationMessages, {
-      model: model || "qwen2.5:3b",
+    // const result = await orchestrateLLMConversation(conversationMessages, {
+    //   model: model || "qwen2.5:3b",
+    // });
+    const result = await orchestrateMilvusHybridSearch(conversationMessages, {
+      pageLimit: 2,   // Top 2 pages
+      chunkLimit: 5   // Top 5 chunks
     });
 
     return NextResponse.json({

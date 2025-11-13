@@ -11,8 +11,8 @@ load_dotenv()
 # Config from environment variables (must be set externally)
 MILVUS_HOST = os.environ["MILVUS_HOST"]
 MILVUS_PORT = os.environ["MILVUS_PORT"]
-COLLECTION_NAME = os.environ["COLLECTION_NAME"]
-PAGE_COLLECTION_NAME = os.environ.get("PAGE_COLLECTION_NAME", "page_with_meta")  # New collection name
+CHUNKS_COLLECTION_NAME = os.environ.get("CHUNKS_COLLECTION_NAME", "test")
+PAGES_COLLECTION_NAME = os.environ.get("PAGES_COLLECTION_NAME", "page_with_meta")
 EMBEDDING_DIM = int(os.environ["EMBEDDING_DIM"])
 PDF_DIR = os.environ["PDF_DIR"]
 
@@ -92,7 +92,7 @@ def get_existing_page_ids(page_collection):
         results = page_collection.query(
             expr="local_page_num >= 0",
             output_fields=["page_id"],
-            limit=50000
+            limit=1000
         )
         return {r["page_id"] for r in results}
     except Exception as e:
@@ -142,6 +142,8 @@ def insert_embeddings(collection, file_name, file_hash, chunks_data, embeddings,
 
 def insert_page_summaries(page_collection, pages_data, existing_page_ids, model):
     """Insert page summaries into the page metadata collection."""
+    import time
+
     # Filter out pages that already exist
     new_pages = [p for p in pages_data if p['page_id'] not in existing_page_ids]
 
@@ -149,21 +151,64 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
         print("No new pages to summarize.")
         return
 
-    print(f"Generating summaries for {len(new_pages)} pages...")
+    print(f"\n{'='*70}")
+    print(f"📄 Generating summaries for {len(new_pages)} pages...")
+    print(f"{'='*70}")
 
     page_ids = []
     file_ids = []
     local_page_nums = []
     summaries = []
 
-    for page_data in new_pages:
-        # Generate summary using Claude
-        summary = write_summary(page_data['page_text'])
+    start_time = time.time()
+    failed_pages = []
 
-        page_ids.append(page_data['page_id'])
-        file_ids.append(page_data['file_id'])
-        local_page_nums.append(page_data['local_page_num'])
-        summaries.append(summary)
+    for idx, page_data in enumerate(new_pages, 1):
+        try:
+            page_start = time.time()
+
+            # Show progress
+            print(f"\n[{idx}/{len(new_pages)}] Page {page_data['local_page_num']} from '{page_data['file_id']}'")
+            print(f"  └─ Calling Claude API...", end=" ", flush=True)
+
+            # Generate summary using Claude (with timeout)
+            summary = write_summary(page_data['page_text'])
+
+            page_duration = time.time() - page_start
+            elapsed = time.time() - start_time
+            avg_time = elapsed / idx
+            remaining = (len(new_pages) - idx) * avg_time
+
+            print(f"✓ Done in {page_duration:.1f}s")
+            print(f"  └─ Progress: {idx}/{len(new_pages)} | Elapsed: {elapsed:.0f}s | Est. remaining: {remaining:.0f}s")
+
+            page_ids.append(page_data['page_id'])
+            file_ids.append(page_data['file_id'])
+            local_page_nums.append(page_data['local_page_num'])
+            summaries.append(summary)
+
+        except Exception as e:
+            error_msg = str(e)[:150]
+            print(f"✗ FAILED: {error_msg}")
+            failed_pages.append((page_data['page_id'], error_msg))
+
+            # Add placeholder to keep lists aligned
+            page_ids.append(page_data['page_id'])
+            file_ids.append(page_data['file_id'])
+            local_page_nums.append(page_data['local_page_num'])
+            summaries.append(f"[ERROR: Summary generation failed]")
+
+    total_duration = time.time() - start_time
+
+    print(f"\n{'='*70}")
+    print(f"✓ Summary generation complete!")
+    print(f"  Total time: {total_duration:.1f}s ({total_duration/len(new_pages):.1f}s avg per page)")
+    print(f"  Success: {len(new_pages) - len(failed_pages)}/{len(new_pages)}")
+    if failed_pages:
+        print(f"  ⚠ Failed: {len(failed_pages)} pages")
+        for page_id, error in failed_pages[:3]:  # Show first 3 errors
+            print(f"    - {page_id}: {error}")
+    print(f"{'='*70}\n")
 
     # Generate embeddings for the summaries
     print(f"Generating embeddings for {len(summaries)} summaries...")
@@ -179,49 +224,80 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
     ]
 
     page_collection.insert(entities)
-    print(f"Inserted {len(new_pages)} page summaries into {PAGE_COLLECTION_NAME}.")
+    print(f"Inserted {len(new_pages)} page summaries into {PAGES_COLLECTION_NAME}.")
 
 
-def write_summary(pdf):
+def write_summary(pdf, timeout=90, max_length=550):
+    """
+    Generate a summary using Claude API with timeout and length protection.
+
+    Args:
+        pdf: Text content to summarize
+        timeout: Maximum seconds to wait for API response (default: 90)
+        max_length: Maximum character length for summary (default: 550, DB limit: 600)
+
+    Returns:
+        Summary text (guaranteed to be <= max_length)
+
+    Raises:
+        Exception: If API call fails or times out
+    """
     SYSTEMPROMPT = """You are a precise summarization assistant. Your task is to distill PDF page content into concise summaries.
 
-OUTPUT REQUIREMENTS:
-- Extract exactly 3 main points as bullet points
-- Follow with a 2-4 sentence summary of the page
-- Total length: 300-400 characters (strict maximum)
-- Be exhaustive within the character limit - prioritize information density
+CRITICAL REQUIREMENTS:
+- Total length: MAXIMUM 500 characters (STRICT LIMIT - will be truncated if longer)
+- Extract exactly 3 short bullet points (5-10 words each)
+- Follow with a 2-3 sentence summary
 - Use clear, direct language without filler words
-- Focus on key insights, not peripheral details
+- Focus on key insights only
 
 FORMAT:
-- Main point 1
-- Main point 2
-- Main point 3
+- Point 1
+- Point 2
+- Point 3
 
-Summary: [2-4 concise sentences capturing the essence and context of the page]
+Summary: [2-3 sentences]
 
-Optimize for clarity and information value per character."""
-    
-    client = anthropic.Anthropic()
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=300,
-        system=SYSTEMPROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": f"Summarize this PDF page:\n\n{pdf}"
-            }
-        ],
-    )
+BE CONCISE. Every character counts."""
 
-    return message.content[0].text
+    # Limit input length to prevent huge API calls
+    truncated_pdf = pdf[:10000] if len(pdf) > 10000 else pdf
+
+    try:
+        client = anthropic.Anthropic(timeout=timeout)
+        message = client.messages.create(
+            model="claude-3-5-haiku-20241022",  # Haiku: ~10x cheaper than Sonnet
+            max_tokens=250,  # Reduced from 300 to enforce shorter output
+            system=SYSTEMPROMPT,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Summarize this PDF page (MAX 500 chars):\n\n{truncated_pdf}"
+                }
+            ],
+        )
+
+        summary = message.content[0].text
+
+        # Safety: Truncate if Claude exceeded the limit
+        if len(summary) > max_length:
+            print(f"    ⚠ Summary too long ({len(summary)} chars), truncating to {max_length}...")
+            summary = summary[:max_length-3] + "..."
+
+        return summary
+
+    except anthropic.APITimeoutError:
+        raise Exception(f"Claude API timeout after {timeout}s")
+    except anthropic.APIError as e:
+        raise Exception(f"Claude API error: {str(e)[:200]}")
+    except Exception as e:
+        raise Exception(f"Unexpected error: {str(e)[:200]}")
 
 
 def main():
     # Assume both collections already exist
-    collection = Collection(COLLECTION_NAME)
-    page_collection = Collection(PAGE_COLLECTION_NAME)
+    collection = Collection(CHUNKS_COLLECTION_NAME)
+    page_collection = Collection(PAGES_COLLECTION_NAME)
     
     existing_hashes = get_existing_hashes(collection)
     existing_page_ids = get_existing_page_ids(page_collection)

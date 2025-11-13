@@ -11,14 +11,15 @@ const MILVUS_CONFIG = {
   ssl: false,
 };
 
-// Collection configuration from environment
-const COLLECTION_NAME = process.env.COLLECTION_NAME || 'test';
-
 // Vector dimension depends on the embedding model used (all-MiniLM-L6-v2)
 const VECTOR_DIM = parseInt(process.env.EMBEDDING_DIM || '384', 10);
 
-// Schema definition
-const SCHEMA = [
+// Collection names
+const CHUNKS_COLLECTION_NAME = process.env.CHUNKS_COLLECTION_NAME || 'test';
+const PAGES_COLLECTION_NAME = process.env.PAGES_COLLECTION_NAME || 'page_with_meta';
+
+
+const CHUNKS_SCHEMA = [
   {
     name: 'chunk_id',
     data_type: DataType.Int64,
@@ -35,7 +36,8 @@ const SCHEMA = [
   { name: 'location', data_type: DataType.VarChar, max_length: 255 },
   { name: 'chunk', data_type: DataType.FloatVector, dim: VECTOR_DIM },
 ];
-const PAGE_SCHEMA = [
+
+const PAGES_SCHEMA = [
   {
     name: 'page_id',
     data_type: DataType.VarChar,
@@ -45,11 +47,12 @@ const PAGE_SCHEMA = [
   },
   { name: 'file_id', data_type: DataType.VarChar, max_length: 100 },
   { name: 'local_page_num', data_type: DataType.Int32 },
-  { name: 'summary', data_type: DataType.VarChar, max_length: 500 }, // 300-400 chars + buffer
-  { name: 'summary_embedding', data_type: DataType.FloatVector, dim: VECTOR_DIM }, // Required by Milvus
+  { name: 'summary', data_type: DataType.VarChar, max_length: 600 },
+  { name: 'summary_embedding', data_type: DataType.FloatVector, dim: VECTOR_DIM },
 ];
-// Index configuration
-const INDEX_CONFIG = {
+
+
+const CHUNKS_INDEX_CONFIG = {
   field_name: 'chunk',
   index_type: 'HNSW',
   metric_type: 'COSINE',
@@ -59,7 +62,7 @@ const INDEX_CONFIG = {
   },
 };
 
-const PAGE_INDEX_CONFIG = {
+const PAGES_INDEX_CONFIG = {
   field_name: 'summary_embedding',
   index_type: 'HNSW',
   metric_type: 'COSINE',
@@ -69,7 +72,24 @@ const PAGE_INDEX_CONFIG = {
   },
 };
 
-// Initialize Milvus client (singleton)
+const COLLECTION_CONFIGS = {
+  chunks: {
+    name: CHUNKS_COLLECTION_NAME,
+    description: 'Collection for document chunks and embeddings',
+    schema: CHUNKS_SCHEMA,
+    indexConfig: CHUNKS_INDEX_CONFIG,
+  },
+  pages: {
+    name: PAGES_COLLECTION_NAME,
+    description: 'Collection for document pages and their summaries',
+    schema: PAGES_SCHEMA,
+    indexConfig: PAGES_INDEX_CONFIG,
+  },
+};
+
+
+
+
 let client = null;
 
 /**
@@ -84,15 +104,18 @@ function getClient() {
 }
 
 /**
- * Create a collection with the predefined schema
- * @param {string} collectionName - Name of the collection (defaults to COLLECTION_NAME)
+ * Create a collection with the provided schema
+ * @param {string} collectionName - Name of the collection
+ * @param {Array} schema - Schema definition for the collection
+ * @param {string} description - Description of the collection
  * @param {boolean} dropIfExists - Whether to drop the collection if it already exists
  * @returns {Promise<Object>} Result of collection creation
  */
 export async function createCollection(
-  collectionName = COLLECTION_NAME,
-  dropIfExists = false,
-  schema = SCHEMA
+  collectionName,
+  schema,
+  description = '',
+  dropIfExists = false
 ) {
   const milvusClient = getClient();
 
@@ -113,49 +136,82 @@ export async function createCollection(
     }
   }
 
-  if (collectionName == 'test')
-{
   // Create collection
   console.log(`Creating collection '${collectionName}'...`);
   await milvusClient.createCollection({
     collection_name: collectionName,
-    description: 'Collection for document chunks and embeddings',
-    fields: SCHEMA,
+    description: description,
+    fields: schema,
   });
-
-  // Create index on vector field
-  console.log('Creating index on vector field...');
-  await milvusClient.createIndex({
-    collection_name: collectionName,
-    ...INDEX_CONFIG,
-  });
-}else{
-  console.log(`Creating collection '${collectionName}'...`)
-  await milvusClient.createCollection({
-    collection_name: collectionName,
-    description: "Collection for document pages and their summaries",
-    fields: PAGE_SCHEMA
-  });
-
-  // Create index on summary vector field
-  console.log('Creating index on summary_embedding field...');
-  await milvusClient.createIndex({
-    collection_name: collectionName,
-    ...PAGE_INDEX_CONFIG,
-  });
-}
 
   console.log(`Collection '${collectionName}' created successfully.`);
   return { success: true, message: 'Collection created successfully' };
 }
 
 /**
+ * Create an index on a collection's vector field
+ * @param {string} collectionName - Name of the collection
+ * @param {Object} indexConfig - Index configuration object
+ * @returns {Promise<Object>} Result of index creation
+ */
+export async function createIndex(collectionName, indexConfig) {
+  const milvusClient = getClient();
+
+  console.log(`Creating index on '${indexConfig.field_name}' field in '${collectionName}'...`);
+  await milvusClient.createIndex({
+    collection_name: collectionName,
+    ...indexConfig,
+  });
+
+  console.log(`Index created successfully on '${collectionName}'.`);
+  return { success: true, message: 'Index created successfully' };
+}
+
+/**
+ * Create a collection with its index in one call (convenience function)
+ * @param {string} collectionName - Name of the collection
+ * @param {Array} schema - Schema definition
+ * @param {Object} indexConfig - Index configuration
+ * @param {string} description - Collection description
+ * @param {boolean} dropIfExists - Whether to drop if exists
+ * @returns {Promise<Object>} Result of creation
+ */
+export async function createCollectionWithIndex(
+  collectionName,
+  schema,
+  indexConfig,
+  description = '',
+  dropIfExists = false
+) {
+  const createResult = await createCollection(
+    collectionName,
+    schema,
+    description,
+    dropIfExists
+  );
+
+  if (!createResult.success) {
+    return createResult;
+  }
+
+  // Only create index if collection was actually created (not if it already existed)
+  if (createResult.message !== 'Collection already exists') {
+    const indexResult = await createIndex(collectionName, indexConfig);
+    if (!indexResult.success) {
+      return indexResult;
+    }
+  }
+
+  return { success: true, message: 'Collection and index created successfully' };
+}
+
+/**
  * Ingest data into the collection
  * @param {Array<Object>} data - Array of data objects matching the schema
- * @param {string} collectionName - Name of the collection (defaults to COLLECTION_NAME)
+ * @param {string} collectionName - Name of the collection
  * @returns {Promise<Object>} Result of data insertion
  */
-export async function ingestData(data, collectionName = COLLECTION_NAME) {
+export async function ingestData(data, collectionName) {
   const milvusClient = getClient();
 
   // Validate data
@@ -196,16 +252,18 @@ export async function ingestData(data, collectionName = COLLECTION_NAME) {
 /**
  * Search for similar vectors in the collection
  * @param {Array<number>} queryVector - Query vector for similarity search
+ * @param {string} collectionName - Name of the collection
  * @param {number} limit - Maximum number of results to return
  * @param {Array<string>} outputFields - Fields to include in the results
- * @param {string} collectionName - Name of the collection (defaults to COLLECTION_NAME)
+ * @param {string} metricType - Metric type for similarity (default: COSINE)
  * @returns {Promise<Object>} Search results
  */
 export async function search(
   queryVector,
+  collectionName,
   limit = 5,
   outputFields = ['fileID', 'filename', 'page', 'chunk_index', 'chunk_text', 'summary', 'location'],
-  collectionName = COLLECTION_NAME
+  metricType = 'COSINE'
 ) {
   const milvusClient = getClient();
 
@@ -219,7 +277,7 @@ export async function search(
     collection_name: collectionName,
     vector: queryVector,
     limit: limit,
-    metric_type: INDEX_CONFIG.metric_type,
+    metric_type: metricType,
     params: { ef: 64 },
     output_fields: outputFields,
   });
@@ -230,10 +288,10 @@ export async function search(
 
 /**
  * Get collection statistics
- * @param {string} collectionName - Name of the collection (defaults to COLLECTION_NAME)
+ * @param {string} collectionName - Name of the collection
  * @returns {Promise<Object>} Collection statistics
  */
-export async function getCollectionStats(collectionName = COLLECTION_NAME) {
+export async function getCollectionStats(collectionName) {
   const milvusClient = getClient();
 
   const stats = await milvusClient.getCollectionStatistics({
@@ -254,5 +312,14 @@ export async function closeConnection() {
   }
 }
 
-// Export configuration constants
-export { COLLECTION_NAME, VECTOR_DIM, SCHEMA, PAGE_SCHEMA, INDEX_CONFIG, PAGE_INDEX_CONFIG };
+export {
+  MILVUS_CONFIG,
+  VECTOR_DIM,
+  CHUNKS_COLLECTION_NAME,
+  PAGES_COLLECTION_NAME,
+  CHUNKS_SCHEMA,
+  PAGES_SCHEMA,
+  CHUNKS_INDEX_CONFIG,
+  PAGES_INDEX_CONFIG,
+  COLLECTION_CONFIGS,
+};

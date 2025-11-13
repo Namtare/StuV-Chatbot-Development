@@ -1,46 +1,66 @@
 import {
-  createCollection,
+  createCollectionWithIndex,
   ingestData,
   getCollectionStats,
+  COLLECTION_CONFIGS,
   VECTOR_DIM,
 } from './milvus-handler.js';
+
 /**
- * Initialization script that creates collection and ingests a test entity
+ * Initialization script that creates collections and ingests test entities
  * This runs automatically when the Milvus Docker container starts
  */
 async function initializeMilvus() {
   try {
     console.log('=== Milvus Initialization Started ===\n');
 
-    // Create collection
-    console.log('[1/3] Creating collections...');
-    console.log("creating testing collecion (chunk data)")
-    const createResult = await createCollection('test', true);
+    // ========================================================================
+    // Step 1: Create collections with indexes
+    // ========================================================================
+    console.log('[1/4] Creating collections...\n');
 
-    if (!createResult.success) {
-      throw new Error(`Collection 'chunk information' creation failed: ${createResult.message}`);
+    // Create chunks collection
+    console.log('Creating chunks collection (document chunks)...');
+    const chunksResult = await createCollectionWithIndex(
+      COLLECTION_CONFIGS.chunks.name,
+      COLLECTION_CONFIGS.chunks.schema,
+      COLLECTION_CONFIGS.chunks.indexConfig,
+      COLLECTION_CONFIGS.chunks.description,
+      true // dropIfExists
+    );
+
+    if (!chunksResult.success) {
+      throw new Error(`Chunks collection creation failed: ${chunksResult.message}`);
     }
+    console.log(`✓ ${chunksResult.message}\n`);
 
-    console.log(`✓ ${createResult.message}`);
+    // Create pages collection
+    console.log('Creating pages collection (page summaries)...');
+    const pagesResult = await createCollectionWithIndex(
+      COLLECTION_CONFIGS.pages.name,
+      COLLECTION_CONFIGS.pages.schema,
+      COLLECTION_CONFIGS.pages.indexConfig,
+      COLLECTION_CONFIGS.pages.description,
+      true // dropIfExists
+    );
 
-
-    // create page-with-metadata collection
-    console.log("creating  page-meta-information collection (page-summaries)")
-    const createPageMeta = await createCollection("page_with_meta", true)
-    if (!createPageMeta.success) {
-      throw new Error(`Collection creation 'page_with_meta' creation failed: ${createPageMeta.message}`)
+    if (!pagesResult.success) {
+      throw new Error(`Pages collection creation failed: ${pagesResult.message}`);
     }
+    console.log(`✓ ${pagesResult.message}\n`);
 
-    console.log(`✓ ${createPageMeta.message}`);
+    // ========================================================================
+    // Step 2: Ingest test chunk entity
+    // ========================================================================
+    console.log('[2/4] Ingesting test chunk entity...');
 
-    // Create a test entity with a predictable vector
-    // Using a simple pattern: first half is 0.5, second half is 0.8
-    const testVector = [
+    // Create a test vector with a predictable pattern
+    const testChunkVector = [
       ...Array(VECTOR_DIM / 2).fill(0.5),
       ...Array(VECTOR_DIM / 2).fill(0.8),
     ];
 
-    const testEntity = {
+    const testChunkEntity = {
       chunk_id: 1,
       fileID: 'TEST_ENTITY_001',
       filename: 'test-document.pdf',
@@ -50,116 +70,124 @@ async function initializeMilvus() {
       chunk_text: 'This is a test chunk of text from the test document.',
       summary: 'Test document summary for verification purposes.',
       location: 'https://drive.google.com/file/d/TEST_ENTITY_001/view',
-      chunk: testVector,
+      chunk: testChunkVector,
     };
 
-    console.log('\n[2/3] Ingesting test entity...');
-    console.log('Test entity details:');
-    console.log(`  - fileID: ${testEntity.fileID}`);
-    console.log(`  - filename: ${testEntity.filename}`);
-    console.log(`  - file_hash: ${testEntity.file_hash}`);
-    console.log(`  - page: ${testEntity.page}`);
-    console.log(`  - chunk_index: ${testEntity.chunk_index}`);
-    console.log(`  - chunk_text: ${testEntity.chunk_text}`);
-    console.log(`  - summary: ${testEntity.summary}`);
-    console.log(`  - location: ${testEntity.location}`);
-    console.log(`  - vector dimension: ${testVector.length}`);
-    console.log(`  - vector pattern: first half=0.5, second half=0.8`);
+    console.log('Test chunk entity details:');
+    console.log(`  - fileID: ${testChunkEntity.fileID}`);
+    console.log(`  - filename: ${testChunkEntity.filename}`);
+    console.log(`  - page: ${testChunkEntity.page}`);
+    console.log(`  - chunk_text: ${testChunkEntity.chunk_text}`);
+    console.log(`  - vector dimension: ${testChunkVector.length}`);
+    console.log(`  - vector pattern: first half=0.5, second half=0.8\n`);
 
-    const ingestResult = await ingestData([testEntity], 'test');
+    const ingestChunksResult = await ingestData(
+      [testChunkEntity],
+      COLLECTION_CONFIGS.chunks.name
+    );
 
-    // Validate ingestion result
-    if (!ingestResult.success) {
-      throw new Error(`Data ingestion failed: ${ingestResult.message}`);
+    if (!ingestChunksResult.success) {
+      throw new Error(`Chunk data ingestion failed: ${ingestChunksResult.message}`);
     }
 
-    if (!ingestResult.insertCount || ingestResult.insertCount === 0) {
+    if (!ingestChunksResult.insertCount || ingestChunksResult.insertCount === 0) {
       throw new Error(
-        `Data ingestion returned 0 entities. Expected 1 entity to be inserted. ` +
-        `The insertion failed silently.`
+        'Chunk data ingestion returned 0 entities. Expected 1 entity to be inserted.'
       );
     }
 
-    console.log(
-      `✓ Successfully ingested ${ingestResult.insertCount} test entity`
-    );
+    console.log(`✓ Successfully ingested ${ingestChunksResult.insertCount} test chunk entity\n`);
 
+    // ========================================================================
+    // Step 3: Ingest test page entity
+    // ========================================================================
+    console.log('[3/4] Ingesting test page entity...');
 
-    // insert test entity for page-meta-information
+    // Create a test summary vector with a different pattern
     const testSummaryVector = [
       ...Array(VECTOR_DIM / 2).fill(0.3),
       ...Array(VECTOR_DIM / 2).fill(0.7),
     ];
 
-    const testPageMeta = {
-      page_id: "TEST_ENTITY_001_page_1",
-      file_id: "TEST_ENTITY_001",
+    const testPageEntity = {
+      page_id: 'TEST_ENTITY_001_page_1',
+      file_id: 'TEST_ENTITY_001',
       local_page_num: 1,
-      summary: "Sample summary!",
-      summary_embedding: testSummaryVector
-    }
-    console.log("Test entity page-meta details: ")
-    console.log(`  - page_id: ${testPageMeta.page_id}`);
-    console.log(`  - file_id: ${testPageMeta.file_id}`);
-    console.log(`  - local_page_num: ${testPageMeta.local_page_num}`);
-    console.log(`  - summary: ${testPageMeta.summary}`);
+      summary: 'Sample page summary for testing purposes.',
+      summary_embedding: testSummaryVector,
+    };
+
+    console.log('Test page entity details:');
+    console.log(`  - page_id: ${testPageEntity.page_id}`);
+    console.log(`  - file_id: ${testPageEntity.file_id}`);
+    console.log(`  - local_page_num: ${testPageEntity.local_page_num}`);
+    console.log(`  - summary: ${testPageEntity.summary}`);
     console.log(`  - summary_embedding dimension: ${testSummaryVector.length}`);
+    console.log(`  - vector pattern: first half=0.3, second half=0.7\n`);
 
-    const ingestPageMeta = await ingestData([testPageMeta], 'page_with_meta');
-    
-    // Validate ingestion result
-    if (!ingestPageMeta.success) {
-      throw new Error(`Data ingestion failed: ${ingestPageMeta.message}`);
-    }
-
-    if (!ingestPageMeta.insertCount || ingestPageMeta.insertCount === 0) {
-      throw new Error(
-        `Data ingestion returned 0 entities for page-meta. Expected 1 entity to be inserted. ` +
-        `The insertion failed silently.`
-      );
-    }
-
-    console.log(
-      `✓ Successfully ingested ${ingestPageMeta.insertCount} test entity`
+    const ingestPagesResult = await ingestData(
+      [testPageEntity],
+      COLLECTION_CONFIGS.pages.name
     );
 
-
-    // Verify collection stats
-    console.log('\n[3/3] Verifying collection...');
-    const stats = await getCollectionStats('test');
-    const rowCount = stats.data?.row_count;
-
-    const stats_page_meta = await getCollectionStats("page_with_meta");
-    const rowCountPageMeta = stats_page_meta.data?.row_count;
-
-    console.log('Collection statistics:');
-    console.log(`  - Row count chunks: ${rowCount || 'N/A'}`);
-    console.log(`  - Row count pages: ${rowCountPageMeta || 'N/A'}`);
-    // Verify the row count matches
-    if (rowCount === undefined || rowCount === null) {
-      throw new Error('Unable to retrieve collection chunks row count');
-    }
-    if (rowCountPageMeta === undefined || rowCountPageMeta === null){
-      throw new Error("Unable to retrieve collection pages row count");
+    if (!ingestPagesResult.success) {
+      throw new Error(`Page data ingestion failed: ${ingestPagesResult.message}`);
     }
 
-    if (rowCount === 0) {
+    if (!ingestPagesResult.insertCount || ingestPagesResult.insertCount === 0) {
       throw new Error(
-        'Collection chunks has 0 rows after ingestion. Data was not persisted correctly.'
+        'Page data ingestion returned 0 entities. Expected 1 entity to be inserted.'
       );
     }
-    if (rowCountPageMeta === 0){
-      throw new Error(
-        'Collection pages has 0 rows after ingestion. Data was not persisted correctly.'
-      )
+
+    console.log(`✓ Successfully ingested ${ingestPagesResult.insertCount} test page entity\n`);
+
+    // ========================================================================
+    // Step 4: Verify collections
+    // ========================================================================
+    console.log('[4/4] Verifying collections...');
+
+    // Verify chunks collection
+    const chunksStats = await getCollectionStats(COLLECTION_CONFIGS.chunks.name);
+    const chunksRowCount = chunksStats.data?.row_count;
+
+    // Verify pages collection
+    const pagesStats = await getCollectionStats(COLLECTION_CONFIGS.pages.name);
+    const pagesRowCount = pagesStats.data?.row_count;
+
+    console.log('Collection statistics:');
+    console.log(`  - Chunks collection row count: ${chunksRowCount || 'N/A'}`);
+    console.log(`  - Pages collection row count: ${pagesRowCount || 'N/A'}\n`);
+
+    // Validate row counts
+    if (chunksRowCount === undefined || chunksRowCount === null) {
+      throw new Error('Unable to retrieve chunks collection row count');
+    }
+    if (pagesRowCount === undefined || pagesRowCount === null) {
+      throw new Error('Unable to retrieve pages collection row count');
     }
 
-    console.log(`✓ Verified: Collection chunks contains ${rowCount} entity (as expected)`);
-    console.log(`✓ Verified: Collection chunks contains ${rowCountPageMeta} entity (as expected)`);
+    if (chunksRowCount === 0) {
+      throw new Error(
+        'Chunks collection has 0 rows after ingestion. Data was not persisted correctly.'
+      );
+    }
+    if (pagesRowCount === 0) {
+      throw new Error(
+        'Pages collection has 0 rows after ingestion. Data was not persisted correctly.'
+      );
+    }
+
+    console.log(`✓ Verified: Chunks collection contains ${chunksRowCount} entity (as expected)`);
+    console.log(`✓ Verified: Pages collection contains ${pagesRowCount} entity (as expected)`);
+
+    // ========================================================================
+    // Success!
+    // ========================================================================
     console.log('\n=== Milvus Initialization Completed Successfully ===');
-    console.log('✓ Test entities are ready for querying');
+    console.log('✓ Both collections are ready for querying');
     console.log(
-      '✓ Run "docker exec milvus-standalone node /app/test-query.js" to verify the chunk entity..\n'
+      '✓ Run "docker exec milvus-standalone node /app/test-query.js" to verify data\n'
     );
 
     process.exit(0);
