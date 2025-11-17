@@ -30,6 +30,8 @@ export async function POST(req) {
           text: result.content,
         },
       ],
+      structured: result.structured || null,
+      responseType: result.structured ? 'structured' : 'text',
       model: result.model,
       usage: result.usage,
     });

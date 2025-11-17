@@ -22,21 +22,11 @@ import {
   Settings,
   Loader2,
 } from 'lucide-react';
+import MilvusResults from '@/components/milvus/MilvusResults';
 
 export default function ChatWindow() {
   const [messages, setMessages] = useState([
-    // {
-    //   id: crypto.randomUUID(),
 
-    //   role: 'assistant',
-    //   content: 'Philip bitte mach jetzt',
-    // },
-    // { id: crypto.randomUUID(), role: 'user', content: 'Ja mache ich!.' },
-    // {
-    //   id: crypto.randomUUID(),
-    //   role: 'assistant',
-    //   content: 'Danke wenn was ist melde dich',
-    // },
   ]);
   const [value, setValue] = useState('');
   const [sending, setSending] = useState(false);
@@ -84,6 +74,8 @@ export default function ChatWindow() {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: data.content[0].text,
+        structured: data.structured || null,
+        responseType: data.responseType || 'text',
       };
 
       setMessages((m) => [...m, reply]);
@@ -144,7 +136,7 @@ export default function ChatWindow() {
             >
               <div className="space-y-4 px-4 py-4">
                 {messages.map((m) => (
-                  <MessageBubble key={m.id} role={m.role}>
+                  <MessageBubble key={m.id} role={m.role} message={m}>
                     {m.content}
                   </MessageBubble>
                 ))}

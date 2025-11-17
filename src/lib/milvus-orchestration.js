@@ -88,7 +88,49 @@ export async function orchestrateMilvusSearch(messages, options = {}) {
 }
 
 /**
- * Format search results into readable text
+ * Transform Milvus search results into structured format for display components
+ * @param {Array} pageResults - Page search results from Milvus
+ * @param {Array} chunkResults - Chunk search results from Milvus
+ * @returns {Array} Structured results array
+ */
+function transformToStructuredResults(pageResults, chunkResults) {
+  const structured = [];
+
+  // Transform page results
+  pageResults.forEach((result) => {
+    structured.push({
+      type: 'page',
+      score: result.score || 0,
+      metadata: {
+        page_id: result.page_id,
+        file_id: result.file_id,
+        local_page_num: result.local_page_num,
+      },
+      content: result.summary || 'No summary available'
+    });
+  });
+
+  // Transform chunk results
+  chunkResults.forEach((result) => {
+    structured.push({
+      type: 'chunk',
+      score: result.score || 0,
+      metadata: {
+        fileID: result.fileID,
+        filename: result.filename,
+        page: result.page,
+        chunk_index: result.chunk_index,
+        location: result.location,
+      },
+      content: result.chunk_text || 'No content available'
+    });
+  });
+
+  return structured;
+}
+
+/**
+ * Format search results into readable text (kept for backward compatibility)
  * @param {Array} results - Search results from Milvus
  * @param {string} collectionType - 'chunks' or 'pages'
  * @param {boolean} includeScores - Whether to include similarity scores
@@ -179,24 +221,38 @@ export async function orchestrateMilvusHybridSearch(messages, options = {}) {
       ['fileID', 'filename', 'page', 'chunk_index', 'chunk_text', 'location']
     );
 
-    // Step 3: Format combined results
-    const content = `📄 RELEVANT PAGES:
+    // Step 3: Transform results into structured format
+    const structuredResults = transformToStructuredResults(
+      pageResults.results || [],
+      chunkResults.results || []
+    );
 
-${formatResults(pageResults.results || [], 'pages', true)}
+    // Sort all results by similarity score (descending)
+    structuredResults.sort((a, b) => b.score - a.score);
 
-📝 DETAILED CONTENT:
-
-${formatResults(chunkResults.results || [], 'chunks', true)}`;
-
-    const assistantMessage = { role: 'assistant', content };
+    const assistantMessage = {
+      role: 'assistant',
+      content: '', // Empty content, will be replaced by structured data
+      structured: {
+        type: 'milvus_results',
+        results: structuredResults,
+        metadata: {
+          query,
+          totalResults: structuredResults.length,
+          pageCount: pageResults.results?.length || 0,
+          chunkCount: chunkResults.results?.length || 0
+        }
+      }
+    };
 
     return {
-      content,
+      content: '', // Empty content for structured responses
+      structured: assistantMessage.structured,
       messages: [...messages, assistantMessage],
       model: 'milvus-hybrid',
       usage: {
         prompt_tokens: query.length,
-        completion_tokens: content.length
+        completion_tokens: 0 // Structured data doesn't have token count
       }
     };
 
