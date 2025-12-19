@@ -46,7 +46,7 @@ def load_and_split_pdf(file_path, file_id):
             for chunk in page_chunks:
                 chunks_with_pages.append({
                     'text': chunk,
-                    'page_id': page_id  # Now global, not local
+                    'page': page_id  # Now global, not local
                 })
             
             # Store page metadata (one per page, no duplication)
@@ -121,21 +121,34 @@ def insert_embeddings(collection, file_name, file_hash, chunks_data, embeddings,
     """Insert new embeddings into Milvus with all required fields."""
     num_chunks = len(chunks_data)
 
-    # Generate fileID from filename (remove extension and use as ID)
+    # If no chunks exist, skip safely
+    if num_chunks == 0:
+        print(f"⚠️ No chunks found for {file_name}, skipping insertion.")
+        return
+
+    # If embeddings are empty, skip (prevents Milvus crashes)
+    if not embeddings or len(embeddings) != num_chunks:
+        print(f"⚠️ Embedding mismatch for {file_name}: {len(embeddings)} embeddings for {num_chunks} chunks. Skipping.")
+        return
+
     file_id = os.path.splitext(file_name)[0]
 
     entities = [
-        list(range(start_chunk_id, start_chunk_id + num_chunks)),  # chunk_id --> Milvus primary key
-        [file_id] * num_chunks,  # fileID
-        [file_name] * num_chunks,  # filename
-        [file_hash] * num_chunks,  # file_hash
-        [chunk['page_id'] for chunk in chunks_data],  # page_id (NOW GLOBAL!)
-        list(range(len(chunks_data))),  # chunk_index --> pdf-wide chunk location
-        [chunk['text'] for chunk in chunks_data],  # chunk_text
-        [chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text'] for chunk in chunks_data],  # summary (first 200 chars - only for testing purposes!)
-        [PDF_DIR] * num_chunks,  # location (directory path)
-        embeddings,  # chunk (vector)
+        list(range(start_chunk_id, start_chunk_id + num_chunks)),    # chunk_id
+        [file_id] * num_chunks,                                      # fileID
+        [file_name] * num_chunks,                                    # filename
+        [file_hash] * num_chunks,                                    # file_hash
+        [chunk['page'] for chunk in chunks_data],                    # page  <-- WICHTIG
+        list(range(num_chunks)),                                     # chunk_index
+        [chunk['text'] for chunk in chunks_data],                    # chunk_text
+        [
+            chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text']
+            for chunk in chunks_data
+        ],                                                           # summary
+        [PDF_DIR] * num_chunks,                                      # location
+        embeddings                                                   # chunk (vector)
     ]
+
     collection.insert(entities)
     print(f"Inserted {num_chunks} chunks from '{file_name}' into Milvus.")
 
@@ -332,6 +345,10 @@ def main():
         # Then insert chunks with embeddings
         chunk_texts = [chunk['text'] for chunk in chunks_data]
         embeddings = get_embeddings(chunk_texts, model)
+        if len(embeddings) == 0:
+            print(f"⚠️ No embeddings generated for {pdf_file}, skipping.")
+            continue
+
         insert_embeddings(collection, pdf_file, file_hash, chunks_data, embeddings, next_chunk_id)
 
         # Update next_chunk_id for the next file
