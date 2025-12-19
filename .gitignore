@@ -50,3 +50,5 @@ milvus/package-lock.json
 token.json
 client_secret.json
 pdf
+**/__pycache__
+**.db
