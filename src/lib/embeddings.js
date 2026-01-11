@@ -1,62 +1,44 @@
-import { pipeline } from '@xenova/transformers';
+import { OpenAIEmbeddingProvider } from './embeddings/openai-provider.js';
+import { LocalEmbeddingProvider } from './embeddings/local-provider.js';
 
-// Singleton pattern for the embedding model
-let embeddingPipeline = null;
+let providerInstance = null;
 
 /**
- * Get or initialize the embedding pipeline
- * Uses the same model as Python: sentence-transformers/all-MiniLM-L6-v2
- * @returns {Promise<any>} The embedding pipeline
+ * Get singleton embedding provider instance
+ * @returns {Promise<EmbeddingProvider>}
  */
-async function getEmbeddingPipeline() {
-  if (!embeddingPipeline) {
-    console.log('Initializing embedding model (all-MiniLM-L6-v2)...');
-    embeddingPipeline = await pipeline(
-      'feature-extraction',
-      'Xenova/all-MiniLM-L6-v2'
-    );
-    console.log('Embedding model loaded successfully');
+async function getProvider() {
+  if (!providerInstance) {
+    const providerType = process.env.EMBEDDING_PROVIDER || 'local';
+
+    if (providerType === 'openai') {
+      providerInstance = new OpenAIEmbeddingProvider();
+    } else if (providerType === 'local') {
+      providerInstance = new LocalEmbeddingProvider();
+    } else {
+      throw new Error(`Unknown embedding provider: ${providerType}`);
+    }
   }
-  return embeddingPipeline;
+
+  return providerInstance;
 }
 
 /**
- * Generate embeddings for a text string
+ * Generate embedding for a text string
  * @param {string} text - Text to embed
- * @returns {Promise<number[]>} 384-dimensional embedding vector
+ * @returns {Promise<number[]>} Embedding vector
  */
 export async function generateEmbedding(text) {
-  const pipeline = await getEmbeddingPipeline();
-
-  // Generate embedding
-  const output = await pipeline(text, {
-    pooling: 'mean',
-    normalize: true,
-  });
-
-  // Convert to array
-  const embedding = Array.from(output.data);
-
-  return embedding;
+  const provider = await getProvider();
+  return provider.generateEmbedding(text);
 }
 
 /**
  * Generate embeddings for multiple texts (batch processing)
  * @param {string[]} texts - Array of texts to embed
- * @returns {Promise<number[][]>} Array of 384-dimensional embedding vectors
+ * @returns {Promise<number[][]>} Array of embedding vectors
  */
 export async function generateEmbeddings(texts) {
-  const pipeline = await getEmbeddingPipeline();
-
-  const embeddings = await Promise.all(
-    texts.map(async (text) => {
-      const output = await pipeline(text, {
-        pooling: 'mean',
-        normalize: true,
-      });
-      return Array.from(output.data);
-    })
-  );
-
-  return embeddings;
+  const provider = await getProvider();
+  return provider.generateEmbeddings(texts);
 }

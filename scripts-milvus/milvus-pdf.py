@@ -2,10 +2,10 @@ import os
 import hashlib
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 from dotenv import load_dotenv
 import anthropic
+from embeddings import get_embedding_provider
 load_dotenv()
 
 # Config from environment variables (must be set externally)
@@ -58,14 +58,6 @@ def load_and_split_pdf(file_path, file_id):
             })
 
     return chunks_with_pages, pages_with_meta
-
-
-def get_embedding_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
-
-
-def get_embeddings(texts, model):
-    return model.encode(texts, show_progress_bar=True).tolist()
 
 
 def get_existing_hashes(collection):
@@ -134,7 +126,7 @@ def insert_embeddings(collection, file_name, file_hash, chunks_data, embeddings,
     print(f"Inserted {num_chunks} chunks from '{file_name}' into Milvus.")
 
 
-def insert_page_summaries(page_collection, pages_data, existing_page_ids, model):
+def insert_page_summaries(page_collection, pages_data, existing_page_ids, embedding_provider):
     """Insert page summaries into the page metadata collection."""
     import time
 
@@ -163,7 +155,7 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
 
             # Show progress
             print(f"\n[{idx}/{len(new_pages)}] Page {page_data['local_page_num']} from '{page_data['file_id']}'")
-            print(f"  └─ Calling API...", end=" ", flush=True)
+            print(f"  -> Calling API...", end=" ", flush=True)
 
             # Generate summary using Claude (with timeout)
             summary = write_summary(page_data['page_text'])
@@ -173,8 +165,8 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
             avg_time = elapsed / idx
             remaining = (len(new_pages) - idx) * avg_time
 
-            print(f"✓ Done in {page_duration:.1f}s")
-            print(f"  └─ Progress: {idx}/{len(new_pages)} | Elapsed: {elapsed:.0f}s | Est. remaining: {remaining:.0f}s")
+            print(f"OK - Done in {page_duration:.1f}s")
+            print(f"  -> Progress: {idx}/{len(new_pages)} | Elapsed: {elapsed:.0f}s | Est. remaining: {remaining:.0f}s")
 
             page_ids.append(page_data['page_id'])
             file_ids.append(page_data['file_id'])
@@ -183,7 +175,7 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
 
         except Exception as e:
             error_msg = str(e)[:150]
-            print(f"✗ FAILED: {error_msg}")
+            print(f"FAILED: {error_msg}")
             failed_pages.append((page_data['page_id'], error_msg))
 
             # Add placeholder to keep lists aligned
@@ -195,18 +187,18 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
     total_duration = time.time() - start_time
 
     print(f"\n{'='*70}")
-    print(f"✓ Summary generation complete!")
+    print(f"Summary generation complete!")
     print(f"  Total time: {total_duration:.1f}s ({total_duration/len(new_pages):.1f}s avg per page)")
     print(f"  Success: {len(new_pages) - len(failed_pages)}/{len(new_pages)}")
     if failed_pages:
-        print(f"  ⚠ Failed: {len(failed_pages)} pages")
+        print(f"  WARNING - Failed: {len(failed_pages)} pages")
         for page_id, error in failed_pages[:3]:  # Show first 3 errors
             print(f"    - {page_id}: {error}")
     print(f"{'='*70}\n")
 
     # Generate embeddings for the summaries
     print(f"Generating embeddings for {len(summaries)} summaries...")
-    summary_embeddings = get_embeddings(summaries, model)
+    summary_embeddings = embedding_provider.get_embeddings(summaries)
 
     # Insert into page collection
     entities = [
@@ -260,7 +252,7 @@ BE CONCISE. Every character counts."""
     try:
         client = anthropic.Anthropic(timeout=timeout)
         message = client.messages.create(
-            model="claude-3-5-haiku-20250110",  # Haiku: ~10x cheaper than Sonnet
+            model="claude-3-5-haiku-20241022",  # Haiku: ~10x cheaper than Sonnet
             max_tokens=250,  # Reduced from 300 to enforce shorter output
             system=SYSTEMPROMPT,
             messages=[
@@ -292,10 +284,10 @@ def main():
     # Assume both collections already exist
     collection = Collection(CHUNKS_COLLECTION_NAME)
     page_collection = Collection(PAGES_COLLECTION_NAME)
-    
+
     existing_hashes = get_existing_hashes(collection)
     existing_page_ids = get_existing_page_ids(page_collection)
-    model = get_embedding_model()
+    embedding_provider = get_embedding_provider()
 
     # Get max chunk_id to continue from there
     next_chunk_id = get_max_chunk_id(collection) + 1
@@ -321,11 +313,11 @@ def main():
         chunks_data, pages_data = load_and_split_pdf(file_path, file_id)
 
         # Insert page summaries FIRST (so they exist before chunks reference them)
-        insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
+        insert_page_summaries(page_collection, pages_data, existing_page_ids, embedding_provider)
 
         # Then insert chunks with embeddings
         chunk_texts = [chunk['text'] for chunk in chunks_data]
-        embeddings = get_embeddings(chunk_texts, model)
+        embeddings = embedding_provider.get_embeddings(chunk_texts)
         insert_embeddings(collection, pdf_file, file_hash, chunks_data, embeddings, next_chunk_id)
 
         # Update next_chunk_id for the next file

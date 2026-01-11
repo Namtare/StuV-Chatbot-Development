@@ -31,6 +31,7 @@
     "googleapis": "^163.0.0",
     "lucide-react": "^0.546.0",
     "next": "^16.0.10",
+    "openai": "^6.16.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "tailwind-merge": "^3.3.1",
