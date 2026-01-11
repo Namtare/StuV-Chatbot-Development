@@ -46,13 +46,13 @@ def load_and_split_pdf(file_path, file_id):
             for chunk in page_chunks:
                 chunks_with_pages.append({
                     'text': chunk,
-                    'page_id': page_id  # Now global, not local
+                    'page_id': page_id
                 })
             
-            # Store page metadata (one per page, no duplication)
+            # Store page metadata (one per page)
             pages_with_meta.append({
                 'page_id': page_id,
-                'page_text': page_text,  # For summary generation
+                'page_text': page_text,  # For summary later
                 'file_id': file_id,
                 'local_page_num': page_num
             })
@@ -61,17 +61,14 @@ def load_and_split_pdf(file_path, file_id):
 
 
 def get_embedding_model():
-    """Load embedding model."""
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 
 def get_embeddings(texts, model):
-    """Generate embeddings for text chunks."""
     return model.encode(texts, show_progress_bar=True).tolist()
 
 
 def get_existing_hashes(collection):
-    """Fetch all stored file hashes from Milvus."""
     collection.load()
     try:
         results = collection.query(
@@ -86,7 +83,6 @@ def get_existing_hashes(collection):
 
 
 def get_existing_page_ids(page_collection):
-    """Fetch all stored page_ids from page collection to avoid duplicates."""
     page_collection.load()
     try:
         results = page_collection.query(
@@ -101,7 +97,6 @@ def get_existing_page_ids(page_collection):
 
 
 def get_max_chunk_id(collection):
-    """Get the maximum chunk_id from the collection."""
     collection.load()
     try:
         results = collection.query(
@@ -118,7 +113,6 @@ def get_max_chunk_id(collection):
 
 
 def insert_embeddings(collection, file_name, file_hash, chunks_data, embeddings, start_chunk_id):
-    """Insert new embeddings into Milvus with all required fields."""
     num_chunks = len(chunks_data)
 
     # Generate fileID from filename (remove extension and use as ID)
@@ -129,10 +123,10 @@ def insert_embeddings(collection, file_name, file_hash, chunks_data, embeddings,
         [file_id] * num_chunks,  # fileID
         [file_name] * num_chunks,  # filename
         [file_hash] * num_chunks,  # file_hash
-        [chunk['page_id'] for chunk in chunks_data],  # page_id (NOW GLOBAL!)
+        [chunk['page_id'] for chunk in chunks_data],  # page_id (Global)
         list(range(len(chunks_data))),  # chunk_index --> pdf-wide chunk location
         [chunk['text'] for chunk in chunks_data],  # chunk_text
-        [chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text'] for chunk in chunks_data],  # summary (first 200 chars - only for testing purposes!)
+        [chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text'] for chunk in chunks_data],  # summary (first 200 chars - only for testing purposes)
         [PDF_DIR] * num_chunks,  # location (directory path)
         embeddings,  # chunk (vector)
     ]
@@ -152,7 +146,7 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
         return
 
     print(f"\n{'='*70}")
-    print(f"📄 Generating summaries for {len(new_pages)} pages...")
+    print(f"Generating summaries for {len(new_pages)} pages...")
     print(f"{'='*70}")
 
     page_ids = []
@@ -169,7 +163,7 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, model)
 
             # Show progress
             print(f"\n[{idx}/{len(new_pages)}] Page {page_data['local_page_num']} from '{page_data['file_id']}'")
-            print(f"  └─ Calling Claude API...", end=" ", flush=True)
+            print(f"  └─ Calling API...", end=" ", flush=True)
 
             # Generate summary using Claude (with timeout)
             summary = write_summary(page_data['page_text'])
@@ -266,7 +260,7 @@ BE CONCISE. Every character counts."""
     try:
         client = anthropic.Anthropic(timeout=timeout)
         message = client.messages.create(
-            model="claude-3-5-haiku-20241022",  # Haiku: ~10x cheaper than Sonnet
+            model="claude-3-5-haiku-20250110",  # Haiku: ~10x cheaper than Sonnet
             max_tokens=250,  # Reduced from 300 to enforce shorter output
             system=SYSTEMPROMPT,
             messages=[
@@ -281,7 +275,7 @@ BE CONCISE. Every character counts."""
 
         # Safety: Truncate if Claude exceeded the limit
         if len(summary) > max_length:
-            print(f"    ⚠ Summary too long ({len(summary)} chars), truncating to {max_length}...")
+            print(f"Summary too long ({len(summary)} chars), truncating to {max_length}...")
             summary = summary[:max_length-3] + "..."
 
         return summary

@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": ">=1.8.22"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -19,7 +25,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@xenova/transformers": "^2.17.2",
-    "@zilliz/milvus2-sdk-node": "^2.6.4",
+    "@zilliz/milvus2-sdk-node": "^2.6.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "googleapis": "^163.0.0",

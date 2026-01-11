@@ -1,9 +1,5 @@
 import { MilvusClient, DataType } from '@zilliz/milvus2-sdk-node';
 
-// ============================================================================
-// Configuration Constants
-// ============================================================================
-
 // Milvus connection configuration
 const MILVUS_HOST = process.env.MILVUS_HOST || 'localhost';
 const MILVUS_PORT = process.env.MILVUS_PORT || '19530';
@@ -21,10 +17,6 @@ const VECTOR_DIM = parseInt(process.env.EMBEDDING_DIM || '384', 10);
 // Collection names
 const CHUNKS_COLLECTION_NAME = process.env.CHUNKS_COLLECTION_NAME || 'test';
 const PAGES_COLLECTION_NAME = process.env.PAGES_COLLECTION_NAME || 'page_with_meta';
-
-// ============================================================================
-// Schema Definitions
-// ============================================================================
 
 const CHUNKS_SCHEMA = [
   {
@@ -58,10 +50,6 @@ const PAGES_SCHEMA = [
   { name: 'summary_embedding', data_type: DataType.FloatVector, dim: VECTOR_DIM },
 ];
 
-// ============================================================================
-// Index Configurations
-// ============================================================================
-
 const CHUNKS_INDEX_CONFIG = {
   field_name: 'chunk',
   index_type: 'HNSW',
@@ -82,10 +70,6 @@ const PAGES_INDEX_CONFIG = {
   },
 };
 
-// ============================================================================
-// Collection Configurations (grouping schema + index + metadata)
-// ============================================================================
-
 const COLLECTION_CONFIGS = {
   chunks: {
     name: CHUNKS_COLLECTION_NAME,
@@ -101,10 +85,6 @@ const COLLECTION_CONFIGS = {
   },
 };
 
-// ============================================================================
-// Client Management
-// ============================================================================
-
 let client = null;
 
 /**
@@ -117,10 +97,6 @@ function getClient() {
   }
   return client;
 }
-
-// ============================================================================
-// Collection Operations
-// ============================================================================
 
 /**
  * Create a collection with the provided schema
@@ -223,10 +199,6 @@ export async function createCollectionWithIndex(
 
   return { success: true, message: 'Collection and index created successfully' };
 }
-
-// ============================================================================
-// Data Operations
-// ============================================================================
 
 /**
  * Ingest data into the collection
@@ -334,10 +306,6 @@ export async function closeConnection() {
     console.log('Milvus connection closed.');
   }
 }
-
-// ============================================================================
-// Exports
-// ============================================================================
 
 export {
   // Connection config

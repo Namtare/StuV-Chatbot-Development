@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getGDriveMCPTools, callGDriveMCPTool } from "@/lib/mcp-client-gdrive";
 
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.LONGCAT_API_KEY,
 });
 
 export async function POST(request) {

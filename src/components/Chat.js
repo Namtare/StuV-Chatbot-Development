@@ -235,8 +235,10 @@ export default function ChatWindow() {
   );
 }
 
-function MessageBubble({ role, children }) {
+function MessageBubble({ role, message, children }) {
   const isUser = role === 'user';
+  const hasStructuredData = message?.structured?.results;
+
   return (
     <div
       className={cn(
@@ -251,13 +253,20 @@ function MessageBubble({ role, children }) {
       )}
       <div
         className={cn(
-          'max-w-[82%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow',
+          'rounded-2xl text-sm leading-relaxed shadow',
+          hasStructuredData ? 'max-w-[95%] p-0' : 'max-w-[82%] px-3.5 py-2',
           isUser
             ? 'bg-[hsl(217,90%,56%)] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.1)]'
+            : hasStructuredData
+            ? 'bg-transparent shadow-none'
             : 'bg-[hsl(220,10%,14%)] text-muted-foreground shadow-[0_0_0_1px_hsl(220,10%,20%)]'
         )}
       >
-        {children}
+        {hasStructuredData ? (
+          <MilvusResults results={message.structured.results} />
+        ) : (
+          children
+        )}
       </div>
       {isUser && (
         <div className="mt-0.5 grid h-7 w-7 place-items-center rounded-full bg-[hsl(220,10%,18%)] text-white/80">
