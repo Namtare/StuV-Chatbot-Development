@@ -16,11 +16,10 @@ PAGES_COLLECTION_NAME = os.environ.get("PAGES_COLLECTION_NAME", "page_with_meta"
 EMBEDDING_DIM = int(os.environ["EMBEDDING_DIM"])
 PDF_DIR = os.environ["PDF_DIR"]
 
-#Connect to DB
+# Connect to DB
 connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
 
 
-#Functions for embedding new files
 def get_pdf_hash(file_path):
     """Create a hash fingerprint for a PDF to detect content changes."""
     with open(file_path, "rb") as f:
@@ -52,7 +51,7 @@ def load_and_split_pdf(file_path, file_id):
             # Store page metadata (one per page)
             pages_with_meta.append({
                 'page_id': page_id,
-                'page_text': page_text,  # For summary later
+                'page_text': page_text,
                 'file_id': file_id,
                 'local_page_num': page_num
             })
@@ -105,25 +104,36 @@ def get_max_chunk_id(collection):
 
 
 def insert_embeddings(collection, file_name, file_hash, chunks_data, embeddings, start_chunk_id):
+    """Insert new embeddings into Milvus with all required fields."""
     num_chunks = len(chunks_data)
 
-    # Generate fileID from filename (remove extension and use as ID)
+    # Safety check: No chunks
+    if num_chunks == 0:
+        print(f"WARNING: No chunks found for {file_name}, skipping insertion.")
+        return False
+
+    # Safety check: Embedding mismatch
+    if not embeddings or len(embeddings) != num_chunks:
+        print(f"WARNING: Embedding mismatch for {file_name}: {len(embeddings) if embeddings else 0} embeddings for {num_chunks} chunks. Skipping.")
+        return False
+
     file_id = os.path.splitext(file_name)[0]
 
     entities = [
-        list(range(start_chunk_id, start_chunk_id + num_chunks)),  # chunk_id --> Milvus primary key
-        [file_id] * num_chunks,  # fileID
-        [file_name] * num_chunks,  # filename
-        [file_hash] * num_chunks,  # file_hash
-        [chunk['page_id'] for chunk in chunks_data],  # page_id (Global)
-        list(range(len(chunks_data))),  # chunk_index --> pdf-wide chunk location
-        [chunk['text'] for chunk in chunks_data],  # chunk_text
-        [chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text'] for chunk in chunks_data],  # summary (first 200 chars - only for testing purposes)
-        [PDF_DIR] * num_chunks,  # location (directory path)
-        embeddings,  # chunk (vector)
+        list(range(start_chunk_id, start_chunk_id + num_chunks)),  # chunk_id
+        [file_id] * num_chunks,                                    # fileID
+        [file_name] * num_chunks,                                  # filename
+        [file_hash] * num_chunks,                                  # file_hash
+        [chunk['page_id'] for chunk in chunks_data],               # page_id
+        list(range(len(chunks_data))),                             # chunk_index
+        [chunk['text'] for chunk in chunks_data],                  # chunk_text
+        [chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text'] for chunk in chunks_data],  # summary
+        [PDF_DIR] * num_chunks,                                    # location
+        embeddings,                                                # chunk (vector)
     ]
     collection.insert(entities)
     print(f"Inserted {num_chunks} chunks from '{file_name}' into Milvus.")
+    return True
 
 
 def insert_page_summaries(page_collection, pages_data, existing_page_ids, embedding_provider):
@@ -135,7 +145,7 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, embedd
 
     if not new_pages:
         print("No new pages to summarize.")
-        return
+        return True
 
     print(f"\n{'='*70}")
     print(f"Generating summaries for {len(new_pages)} pages...")
@@ -153,11 +163,9 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, embedd
         try:
             page_start = time.time()
 
-            # Show progress
             print(f"\n[{idx}/{len(new_pages)}] Page {page_data['local_page_num']} from '{page_data['file_id']}'")
             print(f"  -> Calling API...", end=" ", flush=True)
 
-            # Generate summary using Claude (with timeout)
             summary = write_summary(page_data['page_text'])
 
             page_duration = time.time() - page_start
@@ -192,15 +200,28 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, embedd
     print(f"  Success: {len(new_pages) - len(failed_pages)}/{len(new_pages)}")
     if failed_pages:
         print(f"  WARNING - Failed: {len(failed_pages)} pages")
-        for page_id, error in failed_pages[:3]:  # Show first 3 errors
+        for page_id, error in failed_pages[:3]:
             print(f"    - {page_id}: {error}")
     print(f"{'='*70}\n")
 
+    # Safety check: No summaries generated
+    if not summaries:
+        print("WARNING: No summaries generated, skipping page insertion.")
+        return False
+
     # Generate embeddings for the summaries
     print(f"Generating embeddings for {len(summaries)} summaries...")
-    summary_embeddings = embedding_provider.get_embeddings(summaries)
+    try:
+        summary_embeddings = embedding_provider.get_embeddings(summaries)
+    except Exception as e:
+        print(f"WARNING: Failed to generate summary embeddings: {e}")
+        return False
 
-    # Insert into page collection
+    # Safety check: Embedding mismatch
+    if not summary_embeddings or len(summary_embeddings) != len(summaries):
+        print(f"WARNING: Summary embedding mismatch. Skipping page insertion.")
+        return False
+
     entities = [
         page_ids,
         file_ids,
@@ -211,23 +232,11 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, embedd
 
     page_collection.insert(entities)
     print(f"Inserted {len(new_pages)} page summaries into {PAGES_COLLECTION_NAME}.")
+    return True
 
 
 def write_summary(pdf, timeout=90, max_length=550):
-    """
-    Generate a summary using Claude API with timeout and length protection.
-
-    Args:
-        pdf: Text content to summarize
-        timeout: Maximum seconds to wait for API response (default: 90)
-        max_length: Maximum character length for summary (default: 550, DB limit: 600)
-
-    Returns:
-        Summary text (guaranteed to be <= max_length)
-
-    Raises:
-        Exception: If API call fails or times out
-    """
+    """Generate a summary using Claude API with timeout and length protection."""
     SYSTEMPROMPT = """You are a precise summarization assistant. Your task is to distill PDF page content into concise summaries.
 
 CRITICAL REQUIREMENTS:
@@ -246,14 +255,13 @@ Summary: [2-3 sentences]
 
 BE CONCISE. Every character counts."""
 
-    # Limit input length to prevent huge API calls
     truncated_pdf = pdf[:10000] if len(pdf) > 10000 else pdf
 
     try:
         client = anthropic.Anthropic(timeout=timeout)
         message = client.messages.create(
-            model="claude-3-5-haiku-20241022",  # Haiku: ~10x cheaper than Sonnet
-            max_tokens=250,  # Reduced from 300 to enforce shorter output
+            model="claude-3-5-haiku-20241022",
+            max_tokens=250,
             system=SYSTEMPROMPT,
             messages=[
                 {
@@ -265,7 +273,6 @@ BE CONCISE. Every character counts."""
 
         summary = message.content[0].text
 
-        # Safety: Truncate if Claude exceeded the limit
         if len(summary) > max_length:
             print(f"Summary too long ({len(summary)} chars), truncating to {max_length}...")
             summary = summary[:max_length-3] + "..."
@@ -281,7 +288,6 @@ BE CONCISE. Every character counts."""
 
 
 def main():
-    # Assume both collections already exist
     collection = Collection(CHUNKS_COLLECTION_NAME)
     page_collection = Collection(PAGES_COLLECTION_NAME)
 
@@ -289,41 +295,87 @@ def main():
     existing_page_ids = get_existing_page_ids(page_collection)
     embedding_provider = get_embedding_provider()
 
-    # Get max chunk_id to continue from there
     next_chunk_id = get_max_chunk_id(collection) + 1
 
     pdf_files = [f for f in os.listdir(PDF_DIR) if f.endswith(".pdf")]
+    
+    # Track results
+    processed = []
+    skipped = []
+    failed = []
 
     for pdf_file in pdf_files:
         file_path = os.path.join(PDF_DIR, pdf_file)
-        file_hash = get_pdf_hash(file_path)
         file_id = os.path.splitext(pdf_file)[0]
 
-        if pdf_file in existing_hashes:
-            if existing_hashes[pdf_file] == file_hash:
-                print(f"Skipping '{pdf_file}' (no changes).")
+        try:
+            file_hash = get_pdf_hash(file_path)
+
+            if pdf_file in existing_hashes:
+                if existing_hashes[pdf_file] == file_hash:
+                    print(f"Skipping '{pdf_file}' (no changes).")
+                    skipped.append(pdf_file)
+                    continue
+                else:
+                    print(f"Updating changed file: {pdf_file}")
+                    collection.delete(expr=f"filename == '{pdf_file}'")
+                    page_collection.delete(expr=f"file_id == '{file_id}'")
+
+            # Load PDF and get both chunks and page metadata
+            chunks_data, pages_data = load_and_split_pdf(file_path, file_id)
+
+            # Safety check: No content extracted
+            if not chunks_data:
+                print(f"WARNING: No content extracted from {pdf_file}, skipping.")
+                failed.append((pdf_file, "No content extracted"))
                 continue
+
+            # Insert page summaries FIRST
+            insert_page_summaries(page_collection, pages_data, existing_page_ids, embedding_provider)
+
+            # Generate embeddings for chunks
+            chunk_texts = [chunk['text'] for chunk in chunks_data]
+            try:
+                embeddings = embedding_provider.get_embeddings(chunk_texts)
+            except Exception as e:
+                print(f"WARNING: Failed to generate embeddings for {pdf_file}: {e}")
+                failed.append((pdf_file, f"Embedding failed: {str(e)[:50]}"))
+                continue
+
+            # Safety check: No embeddings
+            if not embeddings or len(embeddings) == 0:
+                print(f"WARNING: No embeddings generated for {pdf_file}, skipping.")
+                failed.append((pdf_file, "No embeddings generated"))
+                continue
+
+            # Insert chunks
+            success = insert_embeddings(collection, pdf_file, file_hash, chunks_data, embeddings, next_chunk_id)
+
+            if success:
+                next_chunk_id += len(chunks_data)
+                processed.append(pdf_file)
             else:
-                print(f"Updating changed file: {pdf_file}")
-                collection.delete(expr=f"filename == '{pdf_file}'")
-                # Also delete old page summaries for this file
-                page_collection.delete(expr=f"file_id == '{file_id}'")
+                failed.append((pdf_file, "Insertion failed"))
 
-        # Load PDF and get both chunks and page metadata
-        chunks_data, pages_data = load_and_split_pdf(file_path, file_id)
+        except Exception as e:
+            error_msg = str(e)[:100]
+            print(f"\nERROR processing '{pdf_file}': {error_msg}")
+            print(f"Continuing with next file...\n")
+            failed.append((pdf_file, error_msg))
+            continue
 
-        # Insert page summaries FIRST (so they exist before chunks reference them)
-        insert_page_summaries(page_collection, pages_data, existing_page_ids, embedding_provider)
-
-        # Then insert chunks with embeddings
-        chunk_texts = [chunk['text'] for chunk in chunks_data]
-        embeddings = embedding_provider.get_embeddings(chunk_texts)
-        insert_embeddings(collection, pdf_file, file_hash, chunks_data, embeddings, next_chunk_id)
-
-        # Update next_chunk_id for the next file
-        next_chunk_id += len(chunks_data)
-
-    print("All PDFs processed")
+    # Final summary
+    print(f"\n{'='*70}")
+    print("PROCESSING COMPLETE")
+    print(f"{'='*70}")
+    print(f"  Processed: {len(processed)}")
+    print(f"  Skipped (unchanged): {len(skipped)}")
+    print(f"  Failed: {len(failed)}")
+    if failed:
+        print(f"\nFailed files:")
+        for filename, reason in failed:
+            print(f"  - {filename}: {reason}")
+    print(f"{'='*70}\n")
 
 
 if __name__ == "__main__":
