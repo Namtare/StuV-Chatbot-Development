@@ -43,6 +43,25 @@ next-env.d.ts
 # docker volumes
 /volumes
 
+# python virtual enviroment
+
+.venv
+venv
+
+# Python bytecode and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.py[cod]
+*$py.class
+
+
+# Cline
+
+.clineignore
+
 # milvus local dependencies (used only in Docker)
 milvus/node_modules
 milvus/package-lock.json
