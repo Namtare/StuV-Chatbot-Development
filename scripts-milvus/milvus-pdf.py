@@ -271,14 +271,21 @@ BE CONCISE. Every character counts."""
             ],
         )
 
-        summary = message.content[0].text
+        # Extract text from TextBlock only (ignore ThinkingBlock etc.)
+        summary = ""
+        for block in message.content:
+            if hasattr(block, 'text'):
+                summary += block.text  # type: ignore[union-attr]
+        
+        if not summary:
+            raise Exception("No text content in API response")
 
         if len(summary) > max_length:
             print(f"Summary too long ({len(summary)} chars), truncating to {max_length}...")
             summary = summary[:max_length-3] + "..."
 
         return summary
-
+    
     except anthropic.APITimeoutError:
         raise Exception(f"Claude API timeout after {timeout}s")
     except anthropic.APIError as e:
