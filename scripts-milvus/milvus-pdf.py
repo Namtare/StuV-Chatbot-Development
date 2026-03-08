@@ -1,4 +1,5 @@
 import os
+import sys
 import hashlib
 from pymilvus import connections, FieldSchema, CollectionSchema, DataType, Collection, utility
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -6,15 +7,23 @@ from PyPDF2 import PdfReader
 from dotenv import load_dotenv
 import anthropic
 from embeddings import get_embedding_provider
+
+# adjust encoding for windows (in case of Umlaute in filenames)
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 load_dotenv()
 
-# Config from environment variables (must be set externally)
+# Config from environment variables
 MILVUS_HOST = os.environ["MILVUS_HOST"]
 MILVUS_PORT = os.environ["MILVUS_PORT"]
 CHUNKS_COLLECTION_NAME = os.environ.get("CHUNKS_COLLECTION_NAME", "test")
 PAGES_COLLECTION_NAME = os.environ.get("PAGES_COLLECTION_NAME", "page_with_meta")
 EMBEDDING_DIM = int(os.environ["EMBEDDING_DIM"])
-PDF_DIR = os.environ["PDF_DIR"]
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PDF_DIR = os.environ.get("PDF_DIR", os.path.join(SCRIPT_DIR, "..", "pdf"))
+
 
 # Connect to DB
 connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
@@ -260,7 +269,7 @@ BE CONCISE. Every character counts."""
     try:
         client = anthropic.Anthropic(timeout=timeout)
         message = client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=250,
             system=SYSTEMPROMPT,
             messages=[
