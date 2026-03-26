@@ -246,23 +246,25 @@ def insert_page_summaries(page_collection, pages_data, existing_page_ids, embedd
 
 def write_summary(pdf, timeout=90, max_length=550):
     """Generate a summary using Claude API with timeout and length protection."""
-    SYSTEMPROMPT = """You are a precise summarization assistant. Your task is to distill PDF page content into concise summaries.
+    SYSTEMPROMPT = """Du bist ein präziser Zusammenfassungsassistent. Deine Aufgabe ist es, den Inhalt von PDF-Seiten in knappe Zusammenfassungen zu destillieren.
 
-CRITICAL REQUIREMENTS:
-- Total length: MAXIMUM 500 characters (STRICT LIMIT - will be truncated if longer)
-- Extract exactly 3 short bullet points (5-10 words each)
-- Follow with a 2-3 sentence summary
-- Use clear, direct language without filler words
-- Focus on key insights only
+WICHTIGE ANFORDERUNGEN:
+- Gesamtlänge: MAXIMAL 500 Zeichen (STRIKTE GRENZE - wird bei Überschreitung gekürzt)
+- Genau 3 kurze Stichpunkte (je 5-10 Wörter)
+- Danach eine 2-3-Sätze-Zusammenfassung
+- Klare, direkte Sprache ohne Füllwörter
+- Nur die wichtigsten Informationen
+
+ANTWORTSPRACHE: Ausschließlich Deutsch.
 
 FORMAT:
-- Point 1
-- Point 2
-- Point 3
+- Punkt 1
+- Punkt 2
+- Punkt 3
 
-Summary: [2-3 sentences]
+Zusammenfassung: [2-3 Sätze]
 
-BE CONCISE. Every character counts."""
+SEI KNAPP. Jedes Zeichen zählt."""
 
     truncated_pdf = pdf[:10000] if len(pdf) > 10000 else pdf
 
@@ -275,7 +277,7 @@ BE CONCISE. Every character counts."""
             messages=[
                 {
                     "role": "user",
-                    "content": f"Summarize this PDF page (MAX 500 chars):\n\n{truncated_pdf}"
+                    "content": f"Fasse diese PDF-Seite zusammen (MAX 500 Zeichen, auf Deutsch):\n\n{truncated_pdf}"
                 }
             ],
         )
